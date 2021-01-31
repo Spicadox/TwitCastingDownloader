@@ -175,7 +175,7 @@ def m3u8_scrape(link):
         # Turns the tag string to a dict and then cleans it up
         video_dict = eval(video_tag)
         source_url = video_dict.get("2")[0].get("source").get("url")
-        m3u8_url = source_url.replace("/", "")
+        m3u8_url = source_url.replace("\\", "")
         print(m3u8_url)
     except:
         print("Private Video")
