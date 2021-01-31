@@ -62,16 +62,24 @@ def linkCleanUp(argLink):
         cleanLink = cleanLink + "/show/"
         filterType = "show"
         return cleanLink, filterType
-    elif("twitcasting.tv/" in url and len(url) < 23):
+    # pattern is movie/[numbers]
+    moviePattern = re.compile(r'movie/\d+')
+    if("twitcasting.tv/" in url and moviePattern.findall(url) is []):
         if(url.rindex("/") == len(url) - 1):
             cleanLink = url + "show/"
             return cleanLink, "show"
         else:
             cleanLink = url + "/show/"
             return cleanLink, "show"
+    # pattern example: [('https', '://twitcasting.tv/', 'natsuiromatsuri', '/movie/661406762')]
+    moviePattern = re.compile(r'(https|http)(://twitcasting.tv/)(\w+|\d+)(/movie/\d+)')
+    regMatchList = moviePattern.findall(url)
+    if(len(regMatchList[0]) == 4):
+        cleanLink = url
+        return cleanLink, None
     else:
         sys.exit("Invalid Link")
-    return cleanLink
+    return cleanLink, None
 
 
 # Function takes in two arguments: the base link and page number
@@ -155,12 +163,16 @@ def urlCount(soup, filter):
         print("Total Links: " + totalUrl)
         return [totalPages, totalUrl]
 
-# Get m3u8 uri
+
+# Function that takes in the index.m3u8 url
+# Get m3u8 url, cleans it up and then return it
 def m3u8_scrape(link):
     soup = soupSetup(link)
     m3u8_url = ""
     try:
+        # Finds the tag that contains the url
         video_tag = soup.find(class_="video-js")["data-movie-playlist"]
+        # Turns the tag string to a dict and then cleans it up
         video_dict = eval(video_tag)
         source_url = video_dict.get("2")[0].get("source").get("url")
         m3u8_url = source_url.replace("/", "")
@@ -191,6 +203,19 @@ def linkScrape(fileName, soup):
     return linksExtracted, video_list
 
 
+# Function that takes two arguments: the filename and link
+# It calls the m3u8_scrape and writes the output to a csv file
+def singleLinkScrape(fileName, link):
+    linksExtracted = 0
+    with open(fileName, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        print("Links: " + "1")
+        m3u8_link = m3u8_scrape(link)
+        if len(m3u8_link) is not 0:
+            linksExtracted = linksExtracted + 1
+            csv_writer.writerow([m3u8_link])
+    return linksExtracted
+
 # Function that scrapes the entire channel while printing out
 # various information onto the console
 def scrapeChannel():
@@ -220,22 +245,25 @@ def scrapeChannel():
     # Check if the file exist and if it does delete it
     checkFile(fileName)
     # Count the total pages and links to be scraped
-    countList = urlCount(soup, channelFilter)
-    totalPages = countList[0]
-    totalLinks = countList[1]
-    # Print file name
-    print("Filename: " + fileName)
-    for currentPage in range(int(totalPages)):
-        if (currentPage == int(totalPages)):
-            print("\nPage: " + str(currentPage - 1))
-        else:
-            print("\nPage: " + str(currentPage + 1))
-        if (currentPage != 0):
-            updatedLink = updateLink(channelLink, currentPage)
-            soup = soupSetup(updatedLink)
-        linksExtracted += linkScrape(fileName, soup)[0]
-    print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
+    if(channelFilter is not None):
+        countList = urlCount(soup, channelFilter)
+        totalPages = countList[0]
+        totalLinks = countList[1]
 
+        print("Filename: " + fileName)
+        for currentPage in range(int(totalPages)):
+            if (currentPage == int(totalPages)):
+                print("\nPage: " + str(currentPage - 1))
+            else:
+                print("\nPage: " + str(currentPage + 1))
+            if (currentPage != 0):
+                updatedLink = updateLink(channelLink, currentPage)
+                soup = soupSetup(updatedLink)
+            linksExtracted += linkScrape(fileName, soup)[0]
+        print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
+    else:
+        linksExtracted += singleLinkScrape(fileName, channelLink)
+        print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
 
 if __name__ == '__main__':
     scrapeChannel()
