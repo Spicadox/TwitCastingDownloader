@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 from bs4 import BeautifulSoup
 import csv
 import requests
@@ -182,7 +182,7 @@ def m3u8_scrape(link):
     return m3u8_url
 
 # Function takes two arguments: the file name and soup
-# Scrapes the video urls and write it into a csv file
+# Scrapes the video title and url and then write it into a csv file
 # Returns the number of video url extracted for that page
 def linkScrape(fileName, soup):
     video_list = []
@@ -190,16 +190,33 @@ def linkScrape(fileName, soup):
     linksExtracted = 0
     with open(fileName, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
+        # find all video url
         url_list = soup.find_all("a", class_="tw-movie-thumbnail")
+        # find all tag containing video title
+        title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
+
         print("Links: " + str(len(url_list)))
+        # add all video url to video list
         for link in url_list:
             video_list.append(domainName + link["href"])
-
-        for link in video_list:
+        # loops through the link and title list in parallel
+        for link, title in zip(video_list, title_list):
             m3u8_link = m3u8_scrape(link)
+            # check to see if there are any m3u8 links
             if len(m3u8_link) is not 0:
+                # Only write title if src isn't in the tag
+                # Meaning it's not a private video title
+                if not title.has_attr('src'):
+                    title = [title.text.strip()]
+                    title.insert(0, "#")
+                    title = "".join(title)
+                    print(title)
+                    csv_writer.writerow([title])
                 linksExtracted = linksExtracted + 1
                 csv_writer.writerow([m3u8_link])
+                csv_writer.writerow(" ")
+            else:
+                print("Error can't find m3u8 links")
     return linksExtracted, video_list
 
 
