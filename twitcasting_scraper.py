@@ -6,6 +6,7 @@ import sys
 import os
 import argparse
 import re
+import subprocess
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -26,6 +27,10 @@ def arguments():
                         type=str,
                         nargs='+',
                         help="The user's chosen absolute save path for the csv file")
+
+    parser.add_argument('-s', '--scrape',
+                        action='store_true',
+                        help="Scrape url and don't download")
 
     args = parser.parse_args()
     return args
@@ -141,6 +146,12 @@ def checkFile(fileName):
         os.remove(fileName)
 
 
+# Function that takes in foldername and create dir if it doesn't exist
+def createFolder(folderName):
+    if os.path.isdir(folderName) is False:
+        os.mkdir(folderName)
+
+
 # Function that takes in two arguments: soup, and a filter of "show" or "showclips"
 # Find the total page and gets the total link available to be scraped
 # Returns a list that holds the total pages and total url available to be scraped
@@ -180,6 +191,7 @@ def m3u8_scrape(link):
     except:
         print("Private Video")
     return m3u8_url
+
 
 # Function takes two arguments: the file name and soup
 # Scrapes the video title and url and then write it into a csv file
@@ -232,6 +244,84 @@ def linkScrape(fileName, soup):
                 print("Error can't find m3u8 links")
     return linksExtracted, video_list
 
+
+# Function takes two arguments: the file name and soup
+# Scrapes the video title and url and then write it into a csv file
+# And then calls ffmpeg to download the stream
+# Returns the number of video url extracted for that page
+def batchDownloader(fileName, soup):
+    video_list = []
+    domainName = "https://twitcasting.tv"
+    linksExtracted = 0
+    with open(fileName, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        # find all video url
+        url_list = soup.find_all("a", class_="tw-movie-thumbnail")
+        # get channel name
+        channel_name = soup.find("span", class_="tw-user-nav-name").text.strip()
+        # find all tag containing video title
+        title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
+        # find all tag containing date/time
+        date_list = soup.find_all("time", class_="tw-movie-thumbnail-date")
+
+        print("Links: " + str(len(url_list)))
+        # add all video url to video list
+        for link in url_list:
+            video_list.append(domainName + link["href"])
+        # loops through the link and title list in parallel
+        for link, title, date in zip(video_list, title_list, date_list):
+            m3u8_link = m3u8_scrape(link)
+            # check to see if there are any m3u8 links
+            if len(m3u8_link) is not 0:
+                # Use regex to get year, month, and day
+                try:
+                    date = date.text.strip()
+                    video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
+                    day_date = video_date.group(3)
+                    month_date = video_date.group(2)
+                    year_date = video_date.group(1)
+                except:
+                    exit("Error getting dates")
+                # Only write title if src isn't in the tag
+                # Meaning it's not a private video title
+                if not title.has_attr('src'):
+                    full_date = "#" + year_date + month_date + day_date + " - "
+                    title = [title.text.strip()]
+                    title.insert(0, full_date)
+                    title = "".join(title)
+                    print(title)
+                    csv_writer.writerow([title])
+                linksExtracted = linksExtracted + 1
+                csv_writer.writerow([m3u8_link])
+                csv_writer.writerow(" ")
+
+                # Download the stream
+                video_title = title[1:]
+                createFolder(channel_name)
+                curr_dir = os.getcwd()
+                download_dir = curr_dir + "\\" + channel_name
+                ffmpeg_list = ['ffmpeg', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
+                ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
+                subprocess.run(ffmpeg_list)
+                print("\nSuccess\n")
+            else:
+                print("Error can't find m3u8 links")
+    return linksExtracted, video_list
+
+
+# Function that takes three arguments: the fileName, link, and soup
+# It calls the m3u8_scrape and writes the output to a csv file
+# And then downloads that stream
+def linkDownload(fileName, link, soup):
+    linksExtracted = 0
+    with open(fileName, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        print("Links: " + "1")
+        m3u8_link = m3u8_scrape(link)
+        if len(m3u8_link) is not 0:
+            linksExtracted = linksExtracted + 1
+            csv_writer.writerow([m3u8_link])
+    return linksExtracted
 
 # Function that takes two arguments: the filename and link
 # It calls the m3u8_scrape and writes the output to a csv file
@@ -289,7 +379,11 @@ def scrapeChannel():
             if (currentPage != 0):
                 updatedLink = updateLink(channelLink, currentPage)
                 soup = soupSetup(updatedLink)
-            linksExtracted += linkScrape(fileName, soup)[0]
+            # If --scrape is not specified then download video else just scrape
+            if not (args.scrape):
+                linksExtracted += linkScrape(batchDownloader, soup)[0]
+            else:
+                linksExtracted += linkScrape(fileName, soup)[0]
         print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
     else:
         linksExtracted += singleLinkScrape(fileName, channelLink)
