@@ -194,21 +194,34 @@ def linkScrape(fileName, soup):
         url_list = soup.find_all("a", class_="tw-movie-thumbnail")
         # find all tag containing video title
         title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
+        # find all tag containing date/time
+        date_list = soup.find_all("time", class_="tw-movie-thumbnail-date")
+        date_dict = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+                     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
 
         print("Links: " + str(len(url_list)))
         # add all video url to video list
         for link in url_list:
             video_list.append(domainName + link["href"])
         # loops through the link and title list in parallel
-        for link, title in zip(video_list, title_list):
+        for link, title, date in zip(video_list, title_list, date_list):
             m3u8_link = m3u8_scrape(link)
             # check to see if there are any m3u8 links
             if len(m3u8_link) is not 0:
+                try:
+                    date = date.text.strip()
+                    video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
+                    day_date = video_date.group(3)
+                    month_date = video_date.group(2)
+                    year_date = video_date.group(1)
+                except:
+                    exit("Error getting dates")
                 # Only write title if src isn't in the tag
                 # Meaning it's not a private video title
                 if not title.has_attr('src'):
+                    full_date = "#" + year_date + month_date + day_date + " - "
                     title = [title.text.strip()]
-                    title.insert(0, "#")
+                    title.insert(0, full_date)
                     title = "".join(title)
                     print(title)
                     csv_writer.writerow([title])
