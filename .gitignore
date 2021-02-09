@@ -1,7 +1,4 @@
-# Ignore csv files
-*.csv
-.idea
-.pytest_cache
-__pycache__
-index
-*bat
+#Ignore everything but .gitignore and py file
+*
+!.gitignore
+!*.py
