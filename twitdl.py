@@ -30,7 +30,7 @@ def arguments():
 
     parser.add_argument('-s', '--scrape',
                         action='store_true',
-                        help="Scrape url and don't download")
+                        help="Only scrape inputted url and saved as the result in csv file(don't download)")
 
     args = parser.parse_args()
     return args
