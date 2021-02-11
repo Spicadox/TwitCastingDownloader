@@ -2,7 +2,7 @@
 ### Overview
 
 A CLI script that can grab all video links and its respective m3u8 file from a TwitCasting channel. It can grab either videos from "shows" or "showclips".
-Based on user specification all videos will either be downloaded(default) or information can be scraped to a csv file. TwitCastingDownloader can not only support whole channel
+Based on user specification all videos will either be downloaded(default) or m3u8 link can be scraped to a csv file. TwitCastingDownloader can not only support whole channel
 download/scrape, but also single link download/scrape.
 
 
