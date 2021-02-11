@@ -23,7 +23,7 @@ optional arguments:
   -h, --help        show this help message and exit
   -l, --link        The TwitCasting channel link to scrape and get the video links
   -n, --name        Name of the csv file. If not specified a default name will be used.
-  -o, --output      The user's chosen absolute save path for the csv file
+  -o, --output      The user's chosen absolute save path for the download video and/or csv file
   -s, --scrape      Only scrape inputted url and saved as the result in csv file(don't download)
  ```
  Examples: 
