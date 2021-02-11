@@ -217,7 +217,7 @@ def linkScrape(fileName, soup):
         for link, title, date in zip(video_list, title_list, date_list):
             m3u8_link = m3u8_scrape(link)
             # check to see if there are any m3u8 links
-            if len(m3u8_link) is not 0:
+            if len(m3u8_link) != 0:
                 try:
                     date = date.text.strip()
                     video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
@@ -269,7 +269,7 @@ def batchDownload(soup, directoryPath):
     for link, title, date in zip(video_list, title_list, date_list):
         m3u8_link = m3u8_scrape(link)
         # check to see if there are any m3u8 links
-        if len(m3u8_link) is not 0:
+        if len(m3u8_link) != 0:
             # Use regex to get year, month, and day
             try:
                 date = date.text.strip()
@@ -315,7 +315,7 @@ def linkDownload(link, soup, directoryPath):
 
     m3u8_link = m3u8_scrape(link)
     # check to see if there are any m3u8 links
-    if len(m3u8_link) is not 0:
+    if len(m3u8_link) != 0:
         # Use regex to get year, month, and day
         try:
             video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
@@ -351,7 +351,7 @@ def singleLinkScrape(fileName, link):
         csv_writer = csv.writer(csv_file)
         print("Links: " + "1")
         m3u8_link = m3u8_scrape(link)
-        if len(m3u8_link) is not 0:
+        if len(m3u8_link) != 0:
             linksExtracted = linksExtracted + 1
             csv_writer.writerow([m3u8_link])
     return linksExtracted
@@ -363,6 +363,7 @@ def scrapeChannel():
     linksExtracted = 0
     # Get commandline arguments
     args = arguments()
+
     # Get the clean twitcast channel link
     linkCleanedUp = linkCleanUp(args.link)
     channelLink = linkCleanedUp[0]
