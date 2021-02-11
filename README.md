@@ -1,5 +1,3 @@
-# TwitCastingScraper_m3u8
-A script that scrapes all videos on a channel and writes all the index.m3u8 uri to a csv file
 # TwitCastingDownloader
 ### Overview
 
