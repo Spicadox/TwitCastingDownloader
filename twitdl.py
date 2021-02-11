@@ -7,6 +7,7 @@ import os
 import argparse
 import re
 import subprocess
+import signal
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -26,7 +27,7 @@ def arguments():
     parser.add_argument('-o', '--output',
                         type=str,
                         nargs='+',
-                        help="The user's chosen absolute save path for the csv file")
+                        help="The user's chosen absolute save path for the download video and/or csv file")
 
     parser.add_argument('-s', '--scrape',
                         action='store_true',
@@ -103,7 +104,9 @@ def getDirectory(argOutput):
         #     directoryPath = " ".join(argOutput)
         # else:
         #     directoryPath = argOutput
-        directoryPath = argOutput
+        # directoryPath = argOutput
+        directoryPath = "".join(argOutput)
+        print("Directory Path: " + directoryPath)
     else:
         directoryPath = os.getcwd()
     return directoryPath
@@ -283,7 +286,7 @@ def batchDownload(soup, directoryPath):
             # Meaning it's not a private video title
             if not title.has_attr('src'):
                 full_date = year_date + month_date + day_date + " - "
-                title = full_date + "".join(title)
+                title = full_date + "".join(title.text.strip())
                 print(title)
 
             linksExtracted = linksExtracted + 1
@@ -332,9 +335,8 @@ def linkDownload(link, soup, directoryPath):
 
         linksExtracted = linksExtracted + 1
         # Download the stream
-        createFolder(channel_name)
         curr_dir = directoryPath
-        download_dir = curr_dir + "\\" + channel_name
+        download_dir = curr_dir
         ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
         ffmpeg_list += [f'{download_dir}\\{title}.mp4']
         subprocess.run(ffmpeg_list)
@@ -359,6 +361,7 @@ def singleLinkScrape(fileName, link):
 # Function that scrapes/download the entire channel or single link
 # while printing out various information onto the console
 def scrapeChannel():
+    signal.signal(signal.SIGINT, lambda x, y: sys.exit("\nKeyboard Interrupt"))
     # Links extracted
     linksExtracted = 0
     # Get commandline arguments
@@ -403,9 +406,10 @@ def scrapeChannel():
             # If --scrape is not specified then download video else just scrape
             if not args.scrape:
                 linksExtracted += batchDownload(soup, directoryPath)[0]
+                print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
             else:
                 linksExtracted += linkScrape(fileName, soup)[0]
-        print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
+                print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
     else:
         if not args.scrape:
             linksExtracted += linkDownload(channelLink, soup, directoryPath)
