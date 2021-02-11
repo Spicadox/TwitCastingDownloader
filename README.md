@@ -17,7 +17,7 @@ Note: The installation of BeautifulSoup is not required for the executable file.
 
 ### Options and Usages
 ```
-usage: twitscrape.py [-h] [-l] [-n  [...]] [-o OUTPUT [OUTPUT ...]]
+usage: twitdl.py [-h] [-l] [-n  [...]] [-o OUTPUT [OUTPUT ...]]
 
 optional arguments:
   -h, --help        show this help message and exit
@@ -28,6 +28,6 @@ optional arguments:
  ```
  Examples: 
  
- `python twitscape.py -l <TwitCasting Link>`
+ `python twitdl.py -l <TwitCasting Link>`
  
- `python twitscape.py -l <TwitCasting Link> -n "output.csv" -o <Path> -s`
+ `python twitdl.py -l <TwitCasting Link> -n "output.csv" -o <Path> -s`
