@@ -255,6 +255,7 @@ def batchDownload(soup, directoryPath):
     domainName = "https://twitcasting.tv"
     linksExtracted = 0
 
+    # Maybe consider seperating extractor from downloader
     # find all video url
     url_list = soup.find_all("a", class_="tw-movie-thumbnail")
     # get channel name
