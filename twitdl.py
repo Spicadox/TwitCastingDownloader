@@ -344,64 +344,6 @@ def linkDownload(soup, directoryPath, batch, channelLink):
     return linksExtracted, video_list
 
 
-# Function that takes three arguments: the link and soup
-# It calls m3u8_scrape() and downloads the stream
-# The single link download version of batchDownload
-# Returns the number of links downloaded
-# def linkDownload(link, soup, directoryPath):
-#     linksExtracted = 0
-#     # get channel name
-#     channel_name = soup.find("span", class_="tw-user-nav-name").text.strip()
-#     # find all tag containing video title
-#     try:
-#         title = soup.find("span", id="movie_title_content").text.strip()
-#     except:
-#         title = "temp"
-#     # find all tag containing date/time
-#     date = soup.find("time", class_="tw-movie-thumbnail-date").text.strip()
-#
-#     m3u8_link = m3u8_scrape(link)
-#     # check to see if there are any m3u8 links
-#     if len(m3u8_link) != 0:
-#         # Use regex to get year, month, and day
-#         try:
-#             video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
-#             day_date = video_date.group(3)
-#             month_date = video_date.group(2)
-#             year_date = video_date.group(1)
-#         except:
-#             exit("Error getting dates")
-#
-#
-#         full_date = year_date + month_date + day_date + " - "
-#         title = full_date + "".join(title)
-#         print(title)
-#
-#         linksExtracted = linksExtracted + 1
-#         # Download the stream
-#         curr_dir = directoryPath
-#         download_dir = curr_dir
-#         ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
-#         ffmpeg_list += [f'{download_dir}\\{title}.mp4']
-#         subprocess.run(ffmpeg_list)
-#         print("\nSuccessfully Downloaded\n")
-#     else:
-#         print("Error can't find m3u8 links")
-#     return linksExtracted
-
-# Function that takes two arguments: the filename and link
-# It calls the m3u8_scrape and writes the output to a csv file
-# def singleLinkScrape(fileName, link):
-#     linksExtracted = 0
-#     with open(fileName, 'a', newline='') as csv_file:
-#         csv_writer = csv.writer(csv_file)
-#         print("Links: " + "1")
-#         m3u8_link = m3u8_scrape(link)
-#         if len(m3u8_link) != 0:
-#             linksExtracted = linksExtracted + 1
-#             csv_writer.writerow([m3u8_link])
-#     return linksExtracted
-
 # Function that scrapes/download the entire channel or single link
 # while printing out various information onto the console
 def scrapeChannel():
