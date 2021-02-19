@@ -52,6 +52,7 @@ def soupSetup(cleanLink):
 # Takes -l argument and "sanitize" url
 # Returns the "sanitized" url
 def linkCleanUp(argLink):
+    cleanLink = None
     if (argLink is not None):
         url = argLink
     else:
@@ -79,12 +80,13 @@ def linkCleanUp(argLink):
             cleanLink = url + "/show/"
             return cleanLink, "show"
     # pattern example: [('https', '://twitcasting.tv/', 'natsuiromatsuri', '/movie/661406762')]
-    moviePattern = re.compile(r'(https|http)(://twitcasting.tv/)(\w+|\d+)(/movie/\d+)')
+    moviePattern = re.compile(r'(https|http)(://twitcasting.tv/)(.*?)(/movie/\d+)')
     regMatchList = moviePattern.findall(url)
-    if (len(regMatchList[0]) == 4):
-        cleanLink = url
-        return cleanLink, None
-    else:
+    try:
+        if (len(regMatchList[0]) == 4):
+            cleanLink = url
+            return cleanLink, None
+    except:
         sys.exit("Invalid Link")
     return cleanLink, None
 
@@ -356,9 +358,12 @@ def scrapeChannel():
     # Get commandline arguments
     args = arguments()
     # Get the clean twitcast channel link
-    linkCleanedUp = linkCleanUp(args.link)
-    channelLink = linkCleanedUp[0]
-    channelFilter = linkCleanedUp[1]
+    if not None:
+        linkCleanedUp = linkCleanUp(args.link)
+        channelLink = linkCleanedUp[0]
+        channelFilter = linkCleanedUp[1]
+    else:
+        sys.exit("Invalid Link")
     # Set up beautifulsoup
     soup = soupSetup(channelLink)
     # Get the filename
@@ -421,5 +426,5 @@ def scrapeChannel():
 if __name__ == '__main__':
     try:
         scrapeChannel()
-    except:
-        sys.exit("Unexpected Error")
+    except Exception as e:
+        sys.exit(str(e) + "\nUnexpected Error")
