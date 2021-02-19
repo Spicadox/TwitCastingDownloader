@@ -9,6 +9,7 @@ import re
 import subprocess
 import signal
 
+
 # Adds a link, name, and output argument
 # Returns the arguments
 def arguments():
@@ -51,27 +52,27 @@ def soupSetup(cleanLink):
 # Takes -l argument and "sanitize" url
 # Returns the "sanitized" url
 def linkCleanUp(argLink):
-    if(argLink is not None):
+    if (argLink is not None):
         url = argLink
     else:
         url = input("URL: ")
-    #Take a look at this if statement back in master branch
-    if("https://" not in url and "http://" not in url):
+    # Take a look at this if statement back in master branch
+    if ("https://" not in url and "http://" not in url):
         url = "https://" + url
     if ("/showclips" in url):
         cleanLink = url.split("/showclips")[0]
         cleanLink = cleanLink + "/showclips/"
         filterType = "showclips"
         return cleanLink, filterType
-    elif("/show" in url):
+    elif ("/show" in url):
         cleanLink = url.split("/show")[0]
         cleanLink = cleanLink + "/show/"
         filterType = "show"
         return cleanLink, filterType
     # pattern is movie/[numbers]
     moviePattern = re.compile(r'movie/\d+')
-    if("twitcasting.tv/" in url and moviePattern.findall(url) is []):
-        if(url.rindex("/") == len(url) - 1):
+    if ("twitcasting.tv/" in url and moviePattern.findall(url) is []):
+        if (url.rindex("/") == len(url) - 1):
             cleanLink = url + "show/"
             return cleanLink, "show"
         else:
@@ -80,7 +81,7 @@ def linkCleanUp(argLink):
     # pattern example: [('https', '://twitcasting.tv/', 'natsuiromatsuri', '/movie/661406762')]
     moviePattern = re.compile(r'(https|http)(://twitcasting.tv/)(\w+|\d+)(/movie/\d+)')
     regMatchList = moviePattern.findall(url)
-    if(len(regMatchList[0]) == 4):
+    if (len(regMatchList[0]) == 4):
         cleanLink = url
         return cleanLink, None
     else:
@@ -99,7 +100,7 @@ def updateLink(baseLink, pageNumber):
 # Function takes in a directory path argument
 # Returns user specified directory path, else a default path is provided
 def getDirectory(argOutput):
-    if(argOutput is not None):
+    if (argOutput is not None):
         # if(" " in argOutput):
         #     directoryPath = " ".join(argOutput)
         # else:
@@ -115,15 +116,15 @@ def getDirectory(argOutput):
 # Function takes in 3 arguments: soup, sanitized link, and user input file name
 # Returns a proper filename for the csv file based on user input
 def getFileName(soup, cleanLink, argName):
-    #Add special character exception
-    if(argName is not None):
+    # Add special character exception
+    if (argName is not None):
         joinedName = argName
         # Does nothing
         # if(" " in argName):
         #     joinedName = "_".join(argName)
         if (".csv" not in joinedName and isinstance(joinedName, list)):
             fileName = joinedName.append(".csv")
-        if(".csv" not in joinedName):
+        if (".csv" not in joinedName):
             fileName = joinedName + ".csv"
         else:
             fileName = joinedName
@@ -132,7 +133,7 @@ def getFileName(soup, cleanLink, argName):
         if ("/showclips" in cleanLink):
             fileName = channelName.strip() + "_showclips.csv"
             return fileName
-        elif("/show" in cleanLink):
+        elif ("/show" in cleanLink):
             fileName = channelName.strip() + "_shows.csv"
             return fileName
         else:
@@ -145,7 +146,7 @@ def getFileName(soup, cleanLink, argName):
 # Function takes in the file name and check if it exists
 # If the file exists, then remove it(replace the file)
 def checkFile(fileName):
-    if(os.path.isfile(fileName)):
+    if (os.path.isfile(fileName)):
         os.remove(fileName)
 
 
@@ -161,10 +162,10 @@ def createFolder(folderName):
 def urlCount(soup, filter):
     pagingClass = soup.find(class_="tw-pager")
     pagingChildren = pagingClass.findChildren()
-    totalPages = pagingChildren[len(pagingChildren)-1].text
+    totalPages = pagingChildren[len(pagingChildren) - 1].text
     print("Total Pages: " + totalPages)
 
-    if("showclips" in filter):
+    if ("showclips" in filter):
         btnFilter = soup.find_all("a", class_="btn")
         clipFilter = btnFilter[1]
         clipBtn = clipFilter.text
@@ -196,7 +197,7 @@ def m3u8_scrape(link):
     return m3u8_url
 
 
-# Function takes two arguments: the file name and soup
+# Function takes three arguments: the file name, soup, and boolean value batch
 # Scrapes the video title and url and then write it into a csv file
 # Returns the number of video url extracted for that page
 def linkScrape(fileName, soup, batch):
@@ -256,8 +257,8 @@ def linkScrape(fileName, soup, batch):
     return linksExtracted, video_list
 
 
-# Function takes two arguments: the file name and soup
-# Scrapes the video title and url and then write it into a csv file
+# Function takes four arguments: soup, directory path, boolean value batch, and the channel link
+# Scrapes for video info
 # And then calls ffmpeg to download the stream
 # Returns the number of video url extracted for that page
 def linkDownload(soup, directoryPath, batch, channelLink):
@@ -265,6 +266,7 @@ def linkDownload(soup, directoryPath, batch, channelLink):
     domainName = "https://twitcasting.tv"
     linksExtracted = 0
     curr_dir = directoryPath
+    # Batch download
     if batch:
         # Maybe consider separating extractor from downloader
         # find all video url
@@ -310,6 +312,7 @@ def linkDownload(soup, directoryPath, batch, channelLink):
                 print("\nExecuted")
             else:
                 print("Error can't find m3u8 links")
+    # Single link download
     else:
         try:
             title = soup.find("span", id="movie_title_content").text.strip()
@@ -352,7 +355,6 @@ def scrapeChannel():
     linksExtracted = 0
     # Get commandline arguments
     args = arguments()
-
     # Get the clean twitcast channel link
     linkCleanedUp = linkCleanUp(args.link)
     channelLink = linkCleanedUp[0]
@@ -377,6 +379,7 @@ def scrapeChannel():
     # Count the total pages and links to be scraped
     # If it's a batch download/scrape set to true
     batch = channelFilter is not None
+    # Initiate batch download or scrape
     if batch:
         countList = urlCount(soup, channelFilter)
         totalPages = countList[0]
@@ -391,7 +394,7 @@ def scrapeChannel():
             if (currentPage != 0):
                 updatedLink = updateLink(channelLink, currentPage)
                 soup = soupSetup(updatedLink)
-        # If --scrape is not specified then download video else just scrape
+            # If --scrape is not specified then download video else just scrape
             if not args.scrape:
                 linksExtracted += linkDownload(soup, directoryPath, batch, channelLink)[0]
                 if batch:
@@ -405,6 +408,7 @@ def scrapeChannel():
                     print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
                 else:
                     print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
+    # Initiate single download or scrape
     else:
         if not args.scrape:
             linksExtracted += linkDownload(soup, directoryPath, batch, channelLink)[0]
@@ -413,5 +417,9 @@ def scrapeChannel():
             linksExtracted += linkScrape(fileName, channelLink, batch)[0]
             print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
 
+
 if __name__ == '__main__':
-    scrapeChannel()
+    try:
+        scrapeChannel()
+    except:
+        sys.exit("Unexpected Error")
