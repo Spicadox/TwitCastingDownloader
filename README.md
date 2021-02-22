@@ -24,6 +24,8 @@ optional arguments:
   -n, --name        Name of the csv file. If not specified a default name will be used.
   -o, --output      The user's chosen absolute save path for the download video and/or csv file
   -s, --scrape      Only scrape inputted url and saved as the result in csv file(don't download)
+  -f. --file		Location of the text file that contains a list of the secret words
+  -p, --passcode    The secret word to access the locked video
  ```
  Examples: 
  
