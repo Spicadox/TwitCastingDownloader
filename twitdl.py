@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from bs4 import BeautifulSoup
 import csv
+import json
 import requests
 import sys
 import os
@@ -8,7 +9,12 @@ import argparse
 import re
 import subprocess
 import signal
-
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -33,6 +39,21 @@ def arguments():
     parser.add_argument('-s', '--scrape',
                         action='store_true',
                         help="Only scrape inputted url and saved as the result in csv file(don't download)")
+
+    parser.add_argument('-f', '--file',
+                        type=str,
+                        nargs='+',
+                        help="Location of the text file that contains a list of the secret words")
+
+    parser.add_argument('-p', '--passcode',
+                        type=str,
+                        nargs='+',
+                        help="The secret word to access the locked video")
+
+    parser.add_argument('-a', '--archive',
+                        type=str,
+                        nargs='?',
+                        help="")
 
     args = parser.parse_args()
     return args
@@ -144,6 +165,21 @@ def getFileName(soup, cleanLink, argName):
     fileName = "".join(fileName)
     return fileName
 
+def getArchive(archiveArg):
+    archiveExist = False
+    currentDirectory = os.getcwd()
+    try:
+        if archiveArg is not None:
+            archivePath = "".join(archiveArg)
+            print("Archive Path: " + archivePath)
+        else:
+            archivePath = currentDirectory
+    except Exception as exception:
+        print(str(exception) + "\nError, creating archive.txt file in current working directory")
+        archivePath = currentDirectory
+    if os.path.isfile(archivePath) or os.path.isfile(str(currentDirectory) + "\\" + archiveArg):
+        archiveExist = True
+    return archivePath, archiveExist
 
 # Function takes in the file name and check if it exists
 # If the file exists, then remove it(replace the file)
@@ -202,7 +238,7 @@ def m3u8_scrape(link):
 # Function takes three arguments: the file name, soup, and boolean value batch
 # Scrapes the video title and url and then write it into a csv file
 # Returns the number of video url extracted for that page
-def linkScrape(fileName, soup, batch):
+def linkScrape(fileName, soup, batch, passcode_list):
     video_list = []
     domainName = "https://twitcasting.tv"
     linksExtracted = 0
@@ -263,11 +299,16 @@ def linkScrape(fileName, soup, batch):
 # Scrapes for video info
 # And then calls ffmpeg to download the stream
 # Returns the number of video url extracted for that page
-def linkDownload(soup, directoryPath, batch, channelLink):
+def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info):
     video_list = []
+    m3u8_link = []
     domainName = "https://twitcasting.tv"
     linksExtracted = 0
     curr_dir = directoryPath
+    archivePath = archive_info[0]
+    archiveExist = archive_info[1]
+    appended = False
+    m3u8_url = ""
     # Batch download
     if batch:
         # Maybe consider separating extractor from downloader
@@ -278,17 +319,116 @@ def linkDownload(soup, directoryPath, batch, channelLink):
         # find all tag containing video title
         title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
         # find all tag containing date/time
-        date_list = soup.find_all("time", class_="tw-movie-thumbnail-date")
+        date_list = soup.find_all(class_="tw-movie-thumbnail-date")
 
-        print("Links: " + str(len(url_list)))
         createFolder(channel_name)
         download_dir = curr_dir + "\\" + channel_name
+
         # add all video url to video list
         for link in url_list:
             video_list.append(domainName + link["href"])
+
+
+
         # loops through the link and title list in parallel
         for link, title, date in zip(video_list, title_list, date_list):
+            try:
+                csv_list = []
+                if archivePath is not None:
+                    if archiveExist:
+                        csv_format = 'a'
+                        # List index out of range error when theres only 1 link
+                        with open(archivePath, 'r', newline="") as csv_file:
+                            csv_reader = csv.reader(csv_file)
+                            for line in csv_reader:
+                                csv_list.append(line[0])
+                        if link in csv_list:
+                            continue
+                    else:
+                        csv_format = 'w'
+
+
+            except Exception as archiveException:
+                sys.exit(str(archiveException) + "\n Error occurred creating an archive file")
+
+            if len(passcode_list) > 1 and len(title.contents) == 3:
+                # try:
+                #     from selenium import webdriver
+                #     from selenium.webdriver.common.keys import Keys
+                #     from selenium.common.exceptions import NoSuchElementException
+                # except webdriver or Keys as importException:
+                #     sys.exit(str(importException) + "\nError importing")
+
+                driver = webdriver.Chrome()
+                driver.get(link)
+                #driver.find_element_by_css_selector("input[name='password']")
+                #driver.find_element_by_class_name("tw-button-secondary.tw-button-small")
+                password_element = WebDriverWait(driver, 15).until(
+                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+
+                current_passcode = None
+                while len(password_element) > 0:
+                    password_element = WebDriverWait(driver, 15).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+
+                    for passcode in passcode_list:
+                        current_passcode = passcode
+                        password_element = WebDriverWait(driver, 15).until(
+                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+                        button_element = WebDriverWait(driver, 15).until(
+                            EC.presence_of_all_elements_located((By.CLASS_NAME, "tw-button-secondary.tw-button-small")))
+                        #driver.find_element_by_css_selector("[class^='video-js']")
+                        # print(len(WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[class^='video-js']")))))
+                        password_element[0].send_keys(passcode)
+                        button_element[0].click()
+                        try:
+                            password_element = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+                            if len(password_element) > 0:
+                                continue
+                        except:
+                            # Remove the passcode that unlocked the private video
+                            # if current_passcode is not None:
+                            #     passcode_list.remove(current_passcode)
+                            break
+                    # If after checking all the passcode and it's still locked then break out while loop
+                    if len(password_element) >= 0:
+                        break
+
+
+                # If none of the password works then quit driver
+                # Can also avoid the first line after the try so no 15sec delay
+                # driver.quit()
+                try:
+                    m3u8_tag = WebDriverWait(driver, 15).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
+                    if len(m3u8_tag) > 0:
+                        m3u8_tag_dic = json.loads(m3u8_tag[0].get_attribute("data-movie-playlist"))
+                        source_url = m3u8_tag_dic.get("2")[0].get("source").get("url")
+                        m3u8_url = source_url.replace("\\", "")
+                        m3u8_link = m3u8_url
+
+                        if current_passcode is not None:
+                            passcode_list.remove(current_passcode)
+
+
+
+                        driver.quit()
+                except Exception as noElement:
+                    print(str(noElement) + "\nCan't find private m3u8 tag")
+                    driver.quit()
+                    # continue
+
+
+
+            #Remove if statement?
+            # if len(passcode_list) < 1:
+            #     m3u8_link = m3u8_scrape(link)
+
             m3u8_link = m3u8_scrape(link)
+            if m3u8_link is "":
+                m3u8_link = m3u8_url
+                print("hey")
+
+
             # check to see if there are any m3u8 links
             if len(m3u8_link) != 0:
                 # Use regex to get year, month, and day
@@ -305,15 +445,50 @@ def linkDownload(soup, directoryPath, batch, channelLink):
                 if not title.has_attr('src'):
                     full_date = year_date + month_date + day_date + " - "
                     title = full_date + "".join(title.text.strip())
-                    print(title)
+                    print("Title: " + str(title))
 
                 linksExtracted = linksExtracted + 1
                 ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
                 ffmpeg_list += [f'{download_dir}\\{title}.mp4']
                 subprocess.run(ffmpeg_list)
                 print("\nExecuted")
+                # Reset m3u8 link and url
+                m3u8_link = ""
+                m3u8_url = ""
+
+                with open(archivePath, csv_format, newline='') as csv_file:
+                    archiveExist = True
+                    csv_writer = csv.writer(csv_file)
+                    print("CSV_LIST: " + str(csv_list))
+                    # No idea
+                    # if link in csv_list:
+                    #     # video_list.remove(link)
+                    #     # title_list.remove(title)
+                    #     # date_list.remove(date)
+                    #     print("removed")
+                    #     continue
+                    # else:
+                    csv_writer.writerow([link])
+                    # Set appended to be true so on error this appended link can be tested and removed
+                    appended = True
+                    print("appended")
             else:
                 print("Error can't find m3u8 links")
+
+
+
+
+            ###############################################################################################
+                # Remove last link from archive if --archive is specified and m3u8 link can't be found
+                # if archivePath is not None:
+                #     with open(archivePath, "r") as r:
+                #         lines = r.readlines()
+                #         lines = lines[:-1]
+                #     with open(archivePath, "w") as w:
+                #         for line in lines:
+                #             w.write(line)
+                #     print("huh...")
+            ###############################################################################################
     # Single link download
     else:
         try:
@@ -364,6 +539,31 @@ def scrapeChannel():
         channelFilter = linkCleanedUp[1]
     else:
         sys.exit("Invalid Link")
+
+
+
+    # Check and make sure both --file and --passcode isn't specified at once
+    passcode_list = []
+    if args.file and args.passcode:
+        sys.exit("You can not specify both --file and --passcode at the same time.\nExiting")
+    # Check if --file is supplied and if so create a list of the passcode
+    if args.file:
+        try:
+            pass_file = getDirectory(args.file)
+            with open(pass_file, 'r', newline='') as csv_file:
+                csv_reader = csv.reader(csv_file)
+                passcode_list = list(csv_reader)
+        except Exception as f:
+            sys.exit(f + "\nError occurred when opening passcode file")
+    # Check if --passcode is specified and if it is set the passcode to a passcode_list
+    if args.passcode:
+        passcode_list = args.passcode
+    if args.archive:
+        archive_info = getArchive(args.archive)
+    else:
+        archive_info = [None, False]
+
+
     # Set up beautifulsoup
     soup = soupSetup(channelLink)
     # Get the filename
@@ -401,14 +601,14 @@ def scrapeChannel():
                 soup = soupSetup(updatedLink)
             # If --scrape is not specified then download video else just scrape
             if not args.scrape:
-                linksExtracted += linkDownload(soup, directoryPath, batch, channelLink)[0]
+                linksExtracted += linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info)[0]
                 if batch:
                     print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
                 else:
                     sys.exit("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
 
             else:
-                linksExtracted += linkScrape(fileName, soup, batch)[0]
+                linksExtracted += linkScrape(fileName, soup, batch, passcode_list)[0]
                 if batch:
                     print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
                 else:
@@ -416,10 +616,10 @@ def scrapeChannel():
     # Initiate single download or scrape
     else:
         if not args.scrape:
-            linksExtracted += linkDownload(soup, directoryPath, batch, channelLink)[0]
+            linksExtracted += linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info)[0]
             print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
         else:
-            linksExtracted += linkScrape(fileName, channelLink, batch)[0]
+            linksExtracted += linkScrape(fileName, channelLink, batch, passcode_list)[0]
             print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
 
 
