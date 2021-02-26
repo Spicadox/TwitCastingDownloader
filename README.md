@@ -11,7 +11,7 @@ Requires [FFMPEG](https://ffmpeg.org/download.html) in the current working direc
 
 Requires the non-standard modules: [requests](https://pypi.org/project/requests/), [BeautifulSoup](https://pypi.org/project/beautifulsoup4/), and [Selenium](https://pypi.org/project/selenium/). [ChromeDriver](https://chromedriver.chromium.org/) is also required after installing Selenium.
 
-A requirements text file has been included and the command `pip3 install -r requirements.txt` (or pip) can be used to install the required dependencies(except FFMPEG).
+A requirements text file has been included and the command `pip3 install -r requirements.txt` (or pip) can be used to install the required dependencies(except FFMPEG and ChromeDriver).
 
 
 ### Options and Usages
