@@ -53,7 +53,7 @@ def arguments():
     parser.add_argument('-a', '--archive',
                         type=str,
                         nargs='?',
-                        help="")
+                        help="Location of the archive text file that contains a list of urls pertaining to downloaded videos")
 
     args = parser.parse_args()
     return args
@@ -307,7 +307,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     curr_dir = directoryPath
     archivePath = archive_info[0]
     archiveExist = archive_info[1]
-    appended = False
     m3u8_url = ""
     # Batch download
     if batch:
@@ -328,8 +327,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
         for link in url_list:
             video_list.append(domainName + link["href"])
 
-
-
         # loops through the link and title list in parallel
         for link, title, date in zip(video_list, title_list, date_list):
             try:
@@ -347,7 +344,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     else:
                         csv_format = 'w'
 
-
             except Exception as archiveException:
                 sys.exit(str(archiveException) + "\n Error occurred creating an archive file")
 
@@ -361,8 +357,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
                 driver = webdriver.Chrome()
                 driver.get(link)
-                #driver.find_element_by_css_selector("input[name='password']")
-                #driver.find_element_by_class_name("tw-button-secondary.tw-button-small")
                 password_element = WebDriverWait(driver, 15).until(
                     EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
 
@@ -377,8 +371,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
                         button_element = WebDriverWait(driver, 15).until(
                             EC.presence_of_all_elements_located((By.CLASS_NAME, "tw-button-secondary.tw-button-small")))
-                        #driver.find_element_by_css_selector("[class^='video-js']")
-                        # print(len(WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[class^='video-js']")))))
+
                         password_element[0].send_keys(passcode)
                         button_element[0].click()
                         try:
@@ -386,9 +379,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                             if len(password_element) > 0:
                                 continue
                         except:
-                            # Remove the passcode that unlocked the private video
-                            # if current_passcode is not None:
-                            #     passcode_list.remove(current_passcode)
                             break
                     # If after checking all the passcode and it's still locked then break out while loop
                     if len(password_element) >= 0:
@@ -405,23 +395,12 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                         source_url = m3u8_tag_dic.get("2")[0].get("source").get("url")
                         m3u8_url = source_url.replace("\\", "")
                         m3u8_link = m3u8_url
-
                         if current_passcode is not None:
                             passcode_list.remove(current_passcode)
-
-
-
                         driver.quit()
                 except Exception as noElement:
                     print(str(noElement) + "\nCan't find private m3u8 tag")
                     driver.quit()
-                    # continue
-
-
-
-            #Remove if statement?
-            # if len(passcode_list) < 1:
-            #     m3u8_link = m3u8_scrape(link)
 
             m3u8_link = m3u8_scrape(link)
             if m3u8_link is "":
@@ -459,24 +438,11 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 with open(archivePath, csv_format, newline='') as csv_file:
                     archiveExist = True
                     csv_writer = csv.writer(csv_file)
-                    print("CSV_LIST: " + str(csv_list))
-                    # No idea
-                    # if link in csv_list:
-                    #     # video_list.remove(link)
-                    #     # title_list.remove(title)
-                    #     # date_list.remove(date)
-                    #     print("removed")
-                    #     continue
-                    # else:
                     csv_writer.writerow([link])
                     # Set appended to be true so on error this appended link can be tested and removed
-                    appended = True
                     print("appended")
             else:
                 print("Error can't find m3u8 links")
-
-
-
 
             ###############################################################################################
                 # Remove last link from archive if --archive is specified and m3u8 link can't be found
