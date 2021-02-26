@@ -43,12 +43,12 @@ def arguments():
     parser.add_argument('-f', '--file',
                         type=str,
                         nargs='+',
-                        help="Location of the text file that contains a list of the secret words")
+                        help="Location of the text file that contains a list of the secret words. Can not be called along side --passcode")
 
     parser.add_argument('-p', '--passcode',
                         type=str,
                         nargs='+',
-                        help="The secret word to access the locked video")
+                        help="The secret word to access the locked video. Can not be called along side --file")
 
     parser.add_argument('-a', '--archive',
                         type=str,
