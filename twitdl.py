@@ -10,11 +10,11 @@ import re
 import subprocess
 import signal
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
+# from selenium.webdriver.common.keys import Keys
+# from selenium.common.exceptions import NoSuchElementException
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions as EC
+# from selenium.webdriver.common.by import By
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -334,7 +334,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 if archivePath is not None:
                     if archiveExist:
                         csv_format = 'a'
-                        # List index out of range error when theres only 1 link
+                        # List index out of range error when theres extra/less space
                         with open(archivePath, 'r', newline="") as csv_file:
                             csv_reader = csv.reader(csv_file)
                             for line in csv_reader:
@@ -343,28 +343,34 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                             continue
                     else:
                         csv_format = 'w'
-
             except Exception as archiveException:
                 sys.exit(str(archiveException) + "\n Error occurred creating an archive file")
 
+            # If there is more than 1 password and it's a private video
             if len(passcode_list) > 1 and len(title.contents) == 3:
-                # try:
-                #     from selenium import webdriver
-                #     from selenium.webdriver.common.keys import Keys
-                #     from selenium.common.exceptions import NoSuchElementException
-                # except webdriver or Keys as importException:
-                #     sys.exit(str(importException) + "\nError importing")
+                # Try importing selenium
+                try:
+                    from selenium.webdriver.common.keys import Keys
+                    from selenium.common.exceptions import NoSuchElementException
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    from selenium.webdriver.support import expected_conditions as EC
+                    from selenium.webdriver.common.by import By
 
-                driver = webdriver.Chrome()
-                driver.get(link)
+                    driver = webdriver.Chrome()
+                    driver.get(link)
+                except webdriver or Keys as importException:
+                    sys.exit(str(importException) + "\nError importing")
+
+                # Find the password field element on the page
                 password_element = WebDriverWait(driver, 15).until(
                     EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
 
+                # While the password element field remains and correct password hasn't been entered
                 current_passcode = None
                 while len(password_element) > 0:
                     password_element = WebDriverWait(driver, 15).until(
                         EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
-
+                    # Go through all the passcode until the password element field is gone
                     for passcode in passcode_list:
                         current_passcode = passcode
                         password_element = WebDriverWait(driver, 15).until(
@@ -374,27 +380,28 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
                         password_element[0].send_keys(passcode)
                         button_element[0].click()
+                        # If the password field element remains and there are still more passcodes then try again with another passcode
                         try:
                             password_element = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
                             if len(password_element) > 0:
                                 continue
                         except:
                             break
-                    # If after checking all the passcode and it's still locked then break out while loop
+                    # If after checking all the passcode and it's still locked then break out the while loop and move on to another video
                     if len(password_element) >= 0:
                         break
 
-
-                # If none of the password works then quit driver
-                # Can also avoid the first line after the try so no 15sec delay
-                # driver.quit()
+                # Try to find the video element
                 try:
                     m3u8_tag = WebDriverWait(driver, 15).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
+                    # If video element is found then get the m3u8 url
                     if len(m3u8_tag) > 0:
                         m3u8_tag_dic = json.loads(m3u8_tag[0].get_attribute("data-movie-playlist"))
                         source_url = m3u8_tag_dic.get("2")[0].get("source").get("url")
                         m3u8_url = source_url.replace("\\", "")
                         m3u8_link = m3u8_url
+                        # If a passcode was used/set then remove it from the passcode_list
+                        # Helps speeds up entering the passcode by removing used passcode
                         if current_passcode is not None:
                             passcode_list.remove(current_passcode)
                         driver.quit()
@@ -402,10 +409,10 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     print(str(noElement) + "\nCan't find private m3u8 tag")
                     driver.quit()
 
+            # Send m3u8 url and ensure it's a valid m3u8 link
             m3u8_link = m3u8_scrape(link)
             if m3u8_link is "":
                 m3u8_link = m3u8_url
-                print("hey")
 
 
             # check to see if there are any m3u8 links
@@ -413,6 +420,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 # Use regex to get year, month, and day
                 try:
                     date = date.text.strip()
+                    # Find date of the video in year/month/day
                     video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
                     day_date = video_date.group(3)
                     month_date = video_date.group(2)
