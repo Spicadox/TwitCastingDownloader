@@ -9,7 +9,7 @@ import argparse
 import re
 import subprocess
 import signal
-from selenium import webdriver
+# from selenium import webdriver
 # from selenium.webdriver.common.keys import Keys
 # from selenium.common.exceptions import NoSuchElementException
 # from selenium.webdriver.support.ui import WebDriverWait
@@ -124,11 +124,6 @@ def updateLink(baseLink, pageNumber):
 # Returns user specified directory path, else a default path is provided
 def getDirectory(argOutput):
     if (argOutput is not None):
-        # if(" " in argOutput):
-        #     directoryPath = " ".join(argOutput)
-        # else:
-        #     directoryPath = argOutput
-        # directoryPath = argOutput
         directoryPath = "".join(argOutput)
         print("Directory Path: " + directoryPath)
     else:
@@ -350,6 +345,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             if len(passcode_list) > 1 and len(title.contents) == 3:
                 # Try importing selenium
                 try:
+                    from selenium import webdriver
                     from selenium.webdriver.common.keys import Keys
                     from selenium.common.exceptions import NoSuchElementException
                     from selenium.webdriver.support.ui import WebDriverWait
@@ -411,7 +407,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
             # Send m3u8 url and ensure it's a valid m3u8 link
             m3u8_link = m3u8_scrape(link)
-            if m3u8_link is "":
+            if len(m3u8_link) == 0:
                 m3u8_link = m3u8_url
 
 
@@ -435,9 +431,13 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     print("Title: " + str(title))
 
                 linksExtracted = linksExtracted + 1
+
                 ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
                 ffmpeg_list += [f'{download_dir}\\{title}.mp4']
-                subprocess.run(ffmpeg_list)
+                try:
+                    subprocess.run(ffmpeg_list)
+                except Exception:
+                    sys.exit("Error executing ffmpeg")
                 print("\nExecuted")
                 # Reset m3u8 link and url
                 m3u8_link = ""
@@ -452,17 +452,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             else:
                 print("Error can't find m3u8 links")
 
-            ###############################################################################################
-                # Remove last link from archive if --archive is specified and m3u8 link can't be found
-                # if archivePath is not None:
-                #     with open(archivePath, "r") as r:
-                #         lines = r.readlines()
-                #         lines = lines[:-1]
-                #     with open(archivePath, "w") as w:
-                #         for line in lines:
-                #             w.write(line)
-                #     print("huh...")
-            ###############################################################################################
     # Single link download
     else:
         try:
