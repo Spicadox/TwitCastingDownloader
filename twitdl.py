@@ -9,12 +9,7 @@ import argparse
 import re
 import subprocess
 import signal
-# from selenium import webdriver
-# from selenium.webdriver.common.keys import Keys
-# from selenium.common.exceptions import NoSuchElementException
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
-# from selenium.webdriver.common.by import By
+import traceback
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -136,7 +131,8 @@ def getDirectory(argOutput):
 def getFileName(soup, cleanLink, argName):
     # Add special character exception
     if (argName is not None):
-        joinedName = argName
+        # Check if the argName contains illegal characters
+        joinedName = checkFileName(argName)
         # Does nothing
         # if(" " in argName):
         #     joinedName = "_".join(argName)
@@ -148,6 +144,7 @@ def getFileName(soup, cleanLink, argName):
             fileName = joinedName
     else:
         channelName = soup.find(class_="tw-user-nav-name").text
+        channelName = checkFileName(channelName)
         if ("/showclips" in cleanLink):
             fileName = channelName.strip() + "_showclips.csv"
             return fileName
@@ -183,8 +180,20 @@ def checkFile(fileName):
         os.remove(fileName)
 
 
+# Function takes in the file name and check if it contains illegal characters
+# If it contains an illegal character then remove it and return the new file name without the illegal character
+def checkFileName(fileName):
+    invalidName = re.compile(r"[\\*?<>:\"/\|]")
+    newFileName = fileName
+    if re.search(invalidName, fileName) is not None:
+        newFileName = re.sub(invalidName, "", fileName)
+        print("\nInvalid File Name Detected\nNew File Name: " + newFileName)
+    return newFileName
+
+
 # Function that takes in foldername and create dir if it doesn't exist
 def createFolder(folderName):
+    folderName = checkFileName(folderName)
     if os.path.isdir(folderName) is False:
         os.mkdir(folderName)
 
@@ -303,6 +312,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     archivePath = archive_info[0]
     archiveExist = archive_info[1]
     m3u8_url = ""
+    csv_format = 'w'
     # Batch download
     if batch:
         # Maybe consider separating extractor from downloader
@@ -316,7 +326,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
         date_list = soup.find_all(class_="tw-movie-thumbnail-date")
 
         createFolder(channel_name)
-        download_dir = curr_dir + "\\" + channel_name
+        download_dir = curr_dir + "\\" + checkFileName(channel_name)
 
         # add all video url to video list
         for link in url_list:
@@ -442,13 +452,13 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 # Reset m3u8 link and url
                 m3u8_link = ""
                 m3u8_url = ""
-
-                with open(archivePath, csv_format, newline='') as csv_file:
-                    archiveExist = True
-                    csv_writer = csv.writer(csv_file)
-                    csv_writer.writerow([link])
-                    # Set appended to be true so on error this appended link can be tested and removed
-                    print("appended")
+                if archivePath is not None:
+                    with open(archivePath, csv_format, newline='') as csv_file:
+                        archiveExist = True
+                        csv_writer = csv.writer(csv_file)
+                        csv_writer.writerow([link])
+                        # Set appended to be true so on error this appended link can be tested and removed
+                        print("appended")
             else:
                 print("Error can't find m3u8 links")
 
@@ -456,6 +466,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     else:
         try:
             title = soup.find("span", id="movie_title_content").text.strip()
+            title = checkFileName(title)
         except:
             title = "temp"
         # find all tag containing date/time
@@ -503,8 +514,6 @@ def scrapeChannel():
     else:
         sys.exit("Invalid Link")
 
-
-
     # Check and make sure both --file and --passcode isn't specified at once
     passcode_list = []
     if args.file and args.passcode:
@@ -531,6 +540,7 @@ def scrapeChannel():
     soup = soupSetup(channelLink)
     # Get the filename
     fileName = getFileName(soup, channelLink, args.name)
+
     # Get the directory path
     directoryPath = getDirectory(args.output)
     # Set the directory path
@@ -544,6 +554,7 @@ def scrapeChannel():
         sys.exit(e)
     # Check if the file exist and if it does delete it
     checkFile(fileName)
+
     # Count the total pages and links to be scraped
     # If it's a batch download/scrape set to true
     batch = channelFilter is not None
@@ -590,4 +601,6 @@ if __name__ == '__main__':
     try:
         scrapeChannel()
     except Exception as e:
-        sys.exit(str(e) + "\nUnexpected Error")
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        # sys.exit(str(e) + "\nUnexpected Error")
+        traceback.print_exc()
