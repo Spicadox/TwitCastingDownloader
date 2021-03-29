@@ -66,6 +66,7 @@ def soupSetup(cleanLink):
 
 
 # Takes -l argument and "sanitize" url
+# If link doesn't end with /show or /showclips then invalid link
 # Returns the "sanitized" url
 def linkCleanUp(argLink):
     cleanLink = None
@@ -163,6 +164,8 @@ def getArchive(archiveArg):
     try:
         if archiveArg is not None:
             archivePath = "".join(archiveArg)
+            if not archiveArg.endswith(".txt"):
+                archiveArg = archiveArg + ".txt"
             print("Archive Path: " + archivePath)
         else:
             archivePath = currentDirectory
@@ -233,7 +236,7 @@ def m3u8_scrape(link):
         video_dict = eval(video_tag)
         source_url = video_dict.get("2")[0].get("source").get("url")
         m3u8_url = source_url.replace("\\", "")
-        print(m3u8_url)
+        print("m3u8 link: " + m3u8_url)
     except:
         print("Private Video")
     return m3u8_url
@@ -289,8 +292,8 @@ def linkScrape(fileName, soup, batch, passcode_list):
                         title = [title.text.strip()]
                         title.insert(0, full_date)
                         title = "".join(title)
-                        print(title)
-                        csv_writer.writerow([title])
+                        print("Title: " + title)
+                        # csv_writer.writerow([title])
                     linksExtracted = linksExtracted + 1
                     csv_writer.writerow([m3u8_link])
                     csv_writer.writerow(" ")
@@ -458,7 +461,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                         csv_writer = csv.writer(csv_file)
                         csv_writer.writerow([link])
                         # Set appended to be true so on error this appended link can be tested and removed
-                        print("appended")
+                        print("appended\n")
             else:
                 print("Error can't find m3u8 links")
 
@@ -494,7 +497,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             subprocess.run(ffmpeg_list)
             print("\nExecuted")
         else:
-            sys.exit("Error can't find m3u8 links")
+            sys.exit("Error can't find m3u8 links\n")
     return linksExtracted, video_list
 
 
@@ -564,7 +567,8 @@ def scrapeChannel():
         totalPages = countList[0]
         totalLinks = countList[1]
 
-        print("Filename: " + fileName)
+        if args.scrape:
+            print("Filename: " + fileName)
         for currentPage in range(int(totalPages)):
             if (currentPage == int(totalPages)):
                 print("\nPage: " + str(currentPage - 1))
