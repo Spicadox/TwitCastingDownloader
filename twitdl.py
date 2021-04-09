@@ -448,7 +448,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
                 ffmpeg_list += [f'{download_dir}\\{title}.mp4']
                 try:
-                    subprocess.run(ffmpeg_list)
+                    subprocess.run(ffmpeg_list, check=True)
                 except Exception:
                     sys.exit("Error executing ffmpeg")
                 print("\nExecuted")
@@ -494,7 +494,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             download_dir = curr_dir
             ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
             ffmpeg_list += [f'{download_dir}\\{title}.mp4']
-            subprocess.run(ffmpeg_list)
+            subprocess.run(ffmpeg_list, check=True)
             print("\nExecuted")
         else:
             sys.exit("Error can't find m3u8 links\n")
