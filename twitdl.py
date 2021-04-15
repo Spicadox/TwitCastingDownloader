@@ -513,7 +513,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             title = "temp"
         # find all tag containing date/time
         date = soup.find("time", class_="tw-movie-thumbnail-date").text.strip()
-
         m3u8_link = m3u8_scrape(channelLink)
         # check to see if there are any m3u8 links
         if len(m3u8_link) != 0:
@@ -607,7 +606,7 @@ def main():
 
     # Count the total pages and links to be scraped
     # If it's a batch download/scrape set to true
-    batch = channelFilter is not None and not "m3u8"
+    batch = channelFilter is not None
     # Initiate batch download or scrape
     if batch:
         countList = urlCount(soup, channelFilter)
