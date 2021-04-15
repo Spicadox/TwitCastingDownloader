@@ -1,15 +1,17 @@
 #!/usr/bin/env python
-from bs4 import BeautifulSoup
+import argparse
 import csv
 import json
-import requests
-import sys
 import os
-import argparse
 import re
-import subprocess
 import signal
+import subprocess
+import sys
 import traceback
+
+import requests
+from bs4 import BeautifulSoup
+
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -60,7 +62,10 @@ def soupSetup(cleanLink):
         url = cleanLink
     except Exception:
         sys.exit("Invalid URL")
-    req = requests.get(url)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
+        'Origin': 'https://twitcasting.tv'}
+    req = requests.get(url, headers=headers)
     bSoup = BeautifulSoup(req.text, "html.parser")
     return bSoup
 
@@ -74,6 +79,8 @@ def linkCleanUp(argLink):
         url = argLink
     else:
         url = input("URL: ")
+    # Download m3u8 link if provided
+    downloadM3u8(url)
     # Take a look at this if statement back in master branch
     if ("https://" not in url and "http://" not in url):
         url = "https://" + url
@@ -107,6 +114,30 @@ def linkCleanUp(argLink):
         sys.exit("Invalid Link")
     return cleanLink, None
 
+
+# Function takes index.m3u8 link and downloads it in cwd as {video_id}.mp4 and then exits
+def downloadM3u8(m3u8):
+    # Check if its an m3u8 link
+    # https://dl01.twitcasting.tv/tc.vod/v/674030808.0.2-1618443661-1618472461-4ec6dd13-901d44e31383a107/fmp4/index.m3u8
+    moviePattern = re.compile(r'(https|http)(:\/\/.*\.)(twitcasting\.tv\/tc\.vod\/v\/)(\d+)(.*)(\/fmp4\/index\.m3u8)$')
+    regMatchList = moviePattern.findall(m3u8)
+    if len(regMatchList) > 0:
+        video_id = regMatchList[0][3]
+        download_dir = os.getcwd()
+        # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+        # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+        ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                       '-headers', "Origin: https://twitcasting.tv"]
+        ffmpeg_list += ['-n', '-i', m3u8, '-c:v', 'copy', '-c:a', 'copy']
+        ffmpeg_list += [f'{download_dir}\\{video_id}.mp4']
+        try:
+            print("Downloading from index.m3u8\n")
+            subprocess.run(ffmpeg_list, check=True)
+        except Exception:
+            sys.exit("Error executing ffmpeg")
+        print("\nExecuted")
+        sys.exit("\nDownloaded Successfully")
 
 # Function takes in two arguments: the base link and page number
 # Returns a new link by contacting base link and page number
@@ -158,6 +189,7 @@ def getFileName(soup, cleanLink, argName):
     fileName = "".join(fileName)
     return fileName
 
+
 def getArchive(archiveArg):
     archiveExist = False
     currentDirectory = os.getcwd()
@@ -175,6 +207,7 @@ def getArchive(archiveArg):
     if os.path.isfile(archivePath) or os.path.isfile(str(currentDirectory) + "\\" + archiveArg):
         archiveExist = True
     return archivePath, archiveExist
+
 
 # Function takes in the file name and check if it exists
 # If the file exists, then remove it(replace the file)
@@ -232,6 +265,7 @@ def m3u8_scrape(link):
     try:
         # Finds the tag that contains the url
         video_tag = soup.find(class_="video-js")["data-movie-playlist"]
+        print(video_tag)
         # Turns the tag string to a dict and then cleans it up
         video_dict = eval(video_tag)
         source_url = video_dict.get("2")[0].get("source").get("url")
@@ -391,7 +425,8 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                         button_element[0].click()
                         # If the password field element remains and there are still more passcodes then try again with another passcode
                         try:
-                            password_element = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+                            password_element = WebDriverWait(driver, 10).until(
+                                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
                             if len(password_element) > 0:
                                 continue
                         except:
@@ -402,7 +437,8 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
                 # Try to find the video element
                 try:
-                    m3u8_tag = WebDriverWait(driver, 15).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
+                    m3u8_tag = WebDriverWait(driver, 15).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
                     # If video element is found then get the m3u8 url
                     if len(m3u8_tag) > 0:
                         m3u8_tag_dic = json.loads(m3u8_tag[0].get_attribute("data-movie-playlist"))
@@ -422,7 +458,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             m3u8_link = m3u8_scrape(link)
             if len(m3u8_link) == 0:
                 m3u8_link = m3u8_url
-
 
             # check to see if there are any m3u8 links
             if len(m3u8_link) != 0:
@@ -444,8 +479,12 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     print("Title: " + str(title))
 
                 linksExtracted = linksExtracted + 1
-
-                ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
+                # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+                # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+                ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                               '-headers', "Origin: https://twitcasting.tv"]
+                ffmpeg_list += ['-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
                 ffmpeg_list += [f'{download_dir}\\{title}.mp4']
                 try:
                     subprocess.run(ffmpeg_list, check=True)
@@ -492,9 +531,17 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             print(title)
             linksExtracted = linksExtracted + 1
             download_dir = curr_dir
-            ffmpeg_list = ['ffmpeg', '-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
+            # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+            # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+            ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                           '-headers', "Origin: https://twitcasting.tv"]
+            ffmpeg_list += ['-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
             ffmpeg_list += [f'{download_dir}\\{title}.mp4']
-            subprocess.run(ffmpeg_list, check=True)
+            try:
+                subprocess.run(ffmpeg_list, check=True)
+            except Exception:
+                sys.exit("Error executing ffmpeg")
             print("\nExecuted")
         else:
             sys.exit("Error can't find m3u8 links\n")
@@ -503,19 +550,20 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
 # Function that scrapes/download the entire channel or single link
 # while printing out various information onto the console
-def scrapeChannel():
+def main():
+    # Check for keyboard interrupt
     signal.signal(signal.SIGINT, lambda x, y: sys.exit("\nKeyboard Interrupt"))
     # Links extracted
     linksExtracted = 0
     # Get commandline arguments
     args = arguments()
     # Get the clean twitcast channel link
-    if not None:
+    try:
         linkCleanedUp = linkCleanUp(args.link)
         channelLink = linkCleanedUp[0]
         channelFilter = linkCleanedUp[1]
-    else:
-        sys.exit("Invalid Link")
+    except Exception as linkError:
+        sys.exit(linkError + "\nInvalid Link")
 
     # Check and make sure both --file and --passcode isn't specified at once
     passcode_list = []
@@ -538,7 +586,6 @@ def scrapeChannel():
     else:
         archive_info = [None, False]
 
-
     # Set up beautifulsoup
     soup = soupSetup(channelLink)
     # Get the filename
@@ -560,7 +607,7 @@ def scrapeChannel():
 
     # Count the total pages and links to be scraped
     # If it's a batch download/scrape set to true
-    batch = channelFilter is not None
+    batch = channelFilter is not None and not "m3u8"
     # Initiate batch download or scrape
     if batch:
         countList = urlCount(soup, channelFilter)
@@ -603,7 +650,7 @@ def scrapeChannel():
 
 if __name__ == '__main__':
     try:
-        scrapeChannel()
+        main()
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         # sys.exit(str(e) + "\nUnexpected Error")
