@@ -12,6 +12,7 @@ import traceback
 import requests
 from bs4 import BeautifulSoup
 
+#TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
 
 # Adds a link, name, and output argument
 # Returns the arguments
