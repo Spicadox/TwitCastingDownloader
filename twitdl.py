@@ -12,7 +12,8 @@ import traceback
 import requests
 from bs4 import BeautifulSoup
 
-#TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
+# TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
+# TODO Allow user to specify -re and provide their own user-agent
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -266,7 +267,6 @@ def m3u8_scrape(link):
     try:
         # Finds the tag that contains the url
         video_tag = soup.find(class_="video-js")["data-movie-playlist"]
-        print(video_tag)
         # Turns the tag string to a dict and then cleans it up
         video_dict = eval(video_tag)
         source_url = video_dict.get("2")[0].get("source").get("url")
@@ -361,7 +361,11 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
         # find all tag containing video title
         title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
         # find all tag containing date/time
-        date_list = soup.find_all(class_="tw-movie-thumbnail-date")
+        try:
+            date_list = soup.find_all(class_="tw-movie-thumbnail-date")
+        except:
+            # When the class "tw-movie-thumbnail-date", can't be found due to perhaps newly uploaded video or 1st video
+            date_list = soup.find_all("time")
 
         createFolder(channel_name)
         download_dir = curr_dir + "\\" + checkFileName(channel_name)
@@ -482,14 +486,20 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 linksExtracted = linksExtracted + 1
                 # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
                 # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-                ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                #                '-headers', "Origin: https://twitcasting.tv"]
+
+                ffmpeg_list = ['ffmpeg', '-user_agent',
                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                                '-headers', "Origin: https://twitcasting.tv"]
                 ffmpeg_list += ['-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
                 ffmpeg_list += [f'{download_dir}\\{title}.mp4']
+                # Add check for if -a is not specified but downloaded channel video already exist
+                # So check if {title} + .mp4 matches filename in that cwd
                 try:
                     subprocess.run(ffmpeg_list, check=True)
-                except Exception:
+                except subprocess.CalledProcessError as process:
                     sys.exit("Error executing ffmpeg")
                 print("\nExecuted")
                 # Reset m3u8 link and url
@@ -512,8 +522,13 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             title = checkFileName(title)
         except:
             title = "temp"
-        # find all tag containing date/time
-        date = soup.find("time", class_="tw-movie-thumbnail-date").text.strip()
+        # find tag containing date/time
+        try:
+            date = soup.find("time", class_="tw-movie-thumbnail-date").text.strip()
+        except:
+            # When the class "tw-movie-thumbnail-date", can't be found due to perhaps newly uploaded video or 1st video
+            date = soup.find("time").text.strip()
+
         m3u8_link = m3u8_scrape(channelLink)
         # check to see if there are any m3u8 links
         if len(m3u8_link) != 0:
@@ -533,14 +548,18 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             download_dir = curr_dir
             # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
             # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-            ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+            # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+            #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+            #                '-headers', "Origin: https://twitcasting.tv"]
+
+            ffmpeg_list = ['ffmpeg', '-user_agent',
                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                            '-headers', "Origin: https://twitcasting.tv"]
             ffmpeg_list += ['-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
             ffmpeg_list += [f'{download_dir}\\{title}.mp4']
             try:
                 subprocess.run(ffmpeg_list, check=True)
-            except Exception:
+            except subprocess.CalledProcessError as process:
                 sys.exit("Error executing ffmpeg")
             print("\nExecuted")
         else:
