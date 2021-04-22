@@ -5,8 +5,8 @@ A CLI script that can grab all video links and its respective m3u8 file from a T
 Based on user specification all videos will either be downloaded(default) or m3u8 link can be scraped to a csv file. TwitCastingDownloader can not only support whole channel
 download/scrape, but also single link download/scrape. Twitdl can also download locked videos given a passcode or passcode file is included, though this feature requires users to download selenium and chromedriver. 
 The downloading of locked videos only work when trying to download the entire channel.
-Update 4/15/2021: Due to recent changes to Twitcasting, downloads of videos are set at 1x speed, meaning the time it takes to download a video is equivalent to the video length. 
-This was done to avoid the 502 error(rate limiting) imposed by Twitcasting.
+Update 4/15/2021: ~~Due to recent changes to Twitcasting, downloads of videos are set at 1x speed, meaning the time it takes to download a video is equivalent to the video length. 
+This was done to avoid the 502 error(rate limiting) imposed by Twitcasting.~~
 
 
 ### Installation
