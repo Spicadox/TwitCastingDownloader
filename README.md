@@ -9,6 +9,8 @@ The downloading of locked videos only work when trying to download the entire ch
 Update 4/15/2021: ~~Due to recent changes to Twitcasting, downloads of videos are set at 1x speed, meaning the time it takes to download a video is equivalent to the video length. 
 This was done to avoid the 502 error(rate limiting) imposed by Twitcasting.~~
 
+Update 4/22/2021: Rate-limiting has been removed a couple days ago
+
 
 ### Installation
 Requires [FFMPEG](https://ffmpeg.org/download.html) in the current working directory or in PATH.
