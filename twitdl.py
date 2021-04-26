@@ -394,7 +394,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 sys.exit(str(archiveException) + "\n Error occurred creating an archive file")
 
             # If there is more than 1 password and it's a private video
-            if len(passcode_list) > 1 and len(title.contents) == 3:
+            if len(passcode_list) >= 1 and len(title.contents) == 3:
                 # Try importing selenium
                 try:
                     from selenium import webdriver
@@ -403,8 +403,14 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     from selenium.webdriver.support.ui import WebDriverWait
                     from selenium.webdriver.support import expected_conditions as EC
                     from selenium.webdriver.common.by import By
+                    from selenium.webdriver.chrome.options import Options
 
-                    driver = webdriver.Chrome()
+                    # add user-agent and origin to the command-line argument to avoid 502 errors
+                    opts = Options()
+                    opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                    opts.add_argument("Origin: https://twitcasting.tv")
+
+                    driver = webdriver.Chrome(options=opts)
                     driver.get(link)
                 except webdriver or Keys as importException:
                     sys.exit(str(importException) + "\nError importing")
