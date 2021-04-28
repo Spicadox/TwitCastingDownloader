@@ -492,6 +492,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 linksExtracted = linksExtracted + 1
                 # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
                 # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+                # -c copy -bsf:a aac_adtstoasc 
                 # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
                 #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                 #                '-headers', "Origin: https://twitcasting.tv"]
@@ -499,7 +500,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 ffmpeg_list = ['ffmpeg', '-user_agent',
                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                                '-headers', "Origin: https://twitcasting.tv"]
-                ffmpeg_list += ['-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
+                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
                 ffmpeg_list += [f'{download_dir}\\{title}.mp4']
                 # Add check for if -a is not specified but downloaded channel video already exist
                 # So check if {title} + .mp4 matches filename in that cwd
@@ -561,7 +562,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             ffmpeg_list = ['ffmpeg', '-user_agent',
                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                            '-headers', "Origin: https://twitcasting.tv"]
-            ffmpeg_list += ['-n', '-i', m3u8_link, '-c:v', 'copy', '-c:a', 'copy']
+            ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
             ffmpeg_list += [f'{download_dir}\\{title}.mp4']
             try:
                 subprocess.run(ffmpeg_list, check=True)
