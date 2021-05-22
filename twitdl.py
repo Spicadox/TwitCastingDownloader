@@ -226,6 +226,10 @@ def checkFileName(fileName):
     if re.search(invalidName, fileName) is not None:
         newFileName = re.sub(invalidName, "", fileName)
         print("\nInvalid File Name Detected\nNew File Name: " + newFileName)
+    # If file name has multiple lines then join them together(because stripping newline doesn't work)
+    if "\n" in fileName:
+        title_array = fileName.splitlines()
+        newFileName = " ".join(title_array)
     return newFileName
 
 
@@ -486,7 +490,8 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 # Meaning it's not a private video title
                 if not title.has_attr('src'):
                     full_date = year_date + month_date + day_date + " - "
-                    title = full_date + "".join(title.text.strip())
+                    title = checkFileName(title.text.strip())
+                    title = full_date + title
                     print("Title: " + str(title))
 
                 linksExtracted = linksExtracted + 1
