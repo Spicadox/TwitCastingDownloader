@@ -15,7 +15,7 @@ Update 4/22/2021: Rate-limiting has been removed a couple days ago
 ### Installation
 Requires [FFMPEG](https://ffmpeg.org/download.html) in the current working directory or in PATH.
 
-Requires the non-standard modules: [requests](https://pypi.org/project/requests/), [BeautifulSoup](https://pypi.org/project/beautifulsoup4/), and [Selenium](https://pypi.org/project/selenium/). [ChromeDriver](https://chromedriver.chromium.org/) is also required after installing Selenium(recommended), though other web drivers for Edge, Firefox,and Safari are supported. For other webdrivers see [Selenium](https://pypi.org/project/selenium/).
+Requires the non-standard modules: [requests](https://pypi.org/project/requests/), [BeautifulSoup](https://pypi.org/project/beautifulsoup4/), and [Selenium](https://pypi.org/project/selenium/). [ChromeDriver](https://chromedriver.chromium.org/) is also required after installing Selenium(recommended), though other web drivers for Edge, Firefox,and Opera is implemented, its use is not recommended. For other webdrivers see [Selenium](https://pypi.org/project/selenium/).
 
 A requirements text file has been included and the command `pip3 install -r requirements.txt` (or pip) can be used to install the required dependencies(except FFMPEG and ChromeDriver).
 
