@@ -167,9 +167,7 @@ def getFileName(soup, cleanLink, argName):
     if (argName is not None):
         # Check if the argName contains illegal characters
         joinedName = checkFileName(argName)
-        # Does nothing
-        # if(" " in argName):
-        #     joinedName = "_".join(argName)
+
         if (".csv" not in joinedName and isinstance(joinedName, list)):
             fileName = joinedName.append(".csv")
         if (".csv" not in joinedName):
@@ -414,7 +412,34 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
                     opts.add_argument("Origin: https://twitcasting.tv")
 
-                    driver = webdriver.Chrome(options=opts)
+                    # Find a webdriver in path and taking in order of either the chrome driver,
+                    # firefox driver, edge driver, or opera driver
+                    while not False:
+                        try:
+                            driver = webdriver.Chrome(options=opts)
+                            print('Using Chrome Driver')
+                            break
+                        except Exception as webdriverException:
+                            print(webdriverException)
+                        try:
+                            driver = webdriver.Firefox(options=opts)
+                            print('Using Firefox Driver')
+                            break
+                        except Exception as webdriverException:
+                            print(webdriverException)
+                        try:
+                            driver = webdriver.Edge(options=opts)
+                            print('Using Edge Driver')
+                            break
+                        except Exception as webdriverException:
+                            print(webdriverException)
+                        try:
+                            driver = webdriver.Safari(options=opts)
+                            print('Using Safari Driver')
+                            break
+                        except Exception as webdriverException:
+                            exit(webdriverException)
+
                     driver.get(link)
                 except webdriver or Keys as importException:
                     sys.exit(str(importException) + "\nError importing")
