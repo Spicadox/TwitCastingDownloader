@@ -65,37 +65,54 @@ def webDriverSetup():
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.common.by import By
-        from selenium.webdriver.chrome.options import Options
-
-        # add user-agent and origin to the command-line argument to avoid 502 errors
-        opts = Options()
-        opts.add_argument(
-            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-        opts.add_argument("Origin: https://twitcasting.tv")
 
         # Find a webdriver in path and taking in order of either the chrome driver,
         # firefox driver, edge driver, or opera driver
         while not False:
             try:
+                from selenium.webdriver.chrome.options import Options
+                # add user-agent and origin to the command-line argument to avoid 502 errors
+                opts = Options()
+                opts.add_argument(
+                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                opts.add_argument("Origin: https://twitcasting.tv")
                 driver = webdriver.Chrome(options=opts)
                 print('Using Chrome Driver')
                 break
             except Exception as webdriverException:
                 print(webdriverException)
             try:
+                from selenium.webdriver.firefox.options import Options
+                # add user-agent and origin to the command-line argument to avoid 502 errors
+                opts = Options()
+                opts.add_argument(
+                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                opts.add_argument("Origin: https://twitcasting.tv")
                 driver = webdriver.Firefox(options=opts)
                 print('Using Firefox Driver')
                 break
             except Exception as webdriverException:
                 print(webdriverException)
             try:
+                from selenium.webdriver.edge.options import Options
+                # add user-agent and origin to the command-line argument to avoid 502 errors
+                opts = Options()
+                opts.add_argument(
+                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                opts.add_argument("Origin: https://twitcasting.tv")
                 driver = webdriver.Edge(options=opts)
                 print('Using Edge Driver')
                 break
             except Exception as webdriverException:
                 print(webdriverException)
             try:
-                driver = webdriver.Safari(options=opts)
+                from selenium.webdriver.opera.options import Options
+                # add user-agent and origin to the command-line argument to avoid 502 errors
+                opts = Options()
+                opts.add_argument(
+                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                opts.add_argument("Origin: https://twitcasting.tv")
+                driver = webdriver.Opera(options=opts)
                 print('Using Safari Driver')
                 break
             except Exception as webdriverException:
@@ -724,7 +741,7 @@ def main():
     if args.file:
         try:
             pass_file = getDirectory(args.file)
-            with open(pass_file, 'r', newline='') as csv_file:
+            with open(pass_file, 'r', newline='', encoding='utf-8') as csv_file:
                 csv_reader = csv.reader(csv_file)
                 passcode_list = list(csv_reader)
         except Exception as f:
