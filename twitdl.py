@@ -57,6 +57,53 @@ def arguments():
     args = parser.parse_args()
     return args
 
+def webDriverSetup():
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoSuchElementException
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.chrome.options import Options
+
+        # add user-agent and origin to the command-line argument to avoid 502 errors
+        opts = Options()
+        opts.add_argument(
+            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+        opts.add_argument("Origin: https://twitcasting.tv")
+
+        # Find a webdriver in path and taking in order of either the chrome driver,
+        # firefox driver, edge driver, or opera driver
+        while not False:
+            try:
+                driver = webdriver.Chrome(options=opts)
+                print('Using Chrome Driver')
+                break
+            except Exception as webdriverException:
+                print(webdriverException)
+            try:
+                driver = webdriver.Firefox(options=opts)
+                print('Using Firefox Driver')
+                break
+            except Exception as webdriverException:
+                print(webdriverException)
+            try:
+                driver = webdriver.Edge(options=opts)
+                print('Using Edge Driver')
+                break
+            except Exception as webdriverException:
+                print(webdriverException)
+            try:
+                driver = webdriver.Safari(options=opts)
+                print('Using Safari Driver')
+                break
+            except Exception as webdriverException:
+                sys.exit(webdriverException)
+    except webdriver or Keys as importException:
+        sys.exit(str(importException) + "\nError importing")
+    return driver, WebDriverWait, EC, By
+
 
 # Set up the soup and return it while requiring a link as an argument
 def soupSetup(cleanLink):
@@ -252,7 +299,7 @@ def urlCount(soup, filter):
         clipFilter = btnFilter[1]
         clipBtn = clipFilter.text
         totalUrl = clipBtn.replace("Clip ", "").replace("(", "").replace(")", "")
-        print(totalUrl)
+        print("Total Links: " + totalUrl)
         return [totalPages, totalUrl]
     else:
         countLive = soup.find(class_="tw-user-nav-list-count")
@@ -397,52 +444,17 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
             # If there is more than 1 password and it's a private video
             if len(passcode_list) >= 1 and len(title.contents) == 3:
-                # Try importing selenium
+                # Setup selenium
+                webDriver = webDriverSetup()
+                driver = webDriver[0]
+                WebDriverWait = webDriver[1]
+                EC = webDriver[2]
+                By = webDriver[3]
+
                 try:
-                    from selenium import webdriver
-                    from selenium.webdriver.common.keys import Keys
-                    from selenium.common.exceptions import NoSuchElementException
-                    from selenium.webdriver.support.ui import WebDriverWait
-                    from selenium.webdriver.support import expected_conditions as EC
-                    from selenium.webdriver.common.by import By
-                    from selenium.webdriver.chrome.options import Options
-
-                    # add user-agent and origin to the command-line argument to avoid 502 errors
-                    opts = Options()
-                    opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-                    opts.add_argument("Origin: https://twitcasting.tv")
-
-                    # Find a webdriver in path and taking in order of either the chrome driver,
-                    # firefox driver, edge driver, or opera driver
-                    while not False:
-                        try:
-                            driver = webdriver.Chrome(options=opts)
-                            print('Using Chrome Driver')
-                            break
-                        except Exception as webdriverException:
-                            print(webdriverException)
-                        try:
-                            driver = webdriver.Firefox(options=opts)
-                            print('Using Firefox Driver')
-                            break
-                        except Exception as webdriverException:
-                            print(webdriverException)
-                        try:
-                            driver = webdriver.Edge(options=opts)
-                            print('Using Edge Driver')
-                            break
-                        except Exception as webdriverException:
-                            print(webdriverException)
-                        try:
-                            driver = webdriver.Safari(options=opts)
-                            print('Using Safari Driver')
-                            break
-                        except Exception as webdriverException:
-                            exit(webdriverException)
-
                     driver.get(link)
-                except webdriver or Keys as importException:
-                    sys.exit(str(importException) + "\nError importing")
+                except Exception as getLinkException:
+                    sys.exit(getLinkException)
 
                 # Find the password field element on the page
                 password_element = WebDriverWait(driver, 15).until(
@@ -554,6 +566,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
     # Single link download
     else:
+        # find tag containing the video name
         try:
             title = soup.find("span", id="movie_title_content").text.strip()
             title = checkFileName(title)
@@ -566,41 +579,123 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             # When the class "tw-movie-thumbnail-date", can't be found due to perhaps newly uploaded video or 1st video
             date = soup.find("time").text.strip()
 
-        m3u8_link = m3u8_scrape(channelLink)
-        # check to see if there are any m3u8 links
-        if len(m3u8_link) != 0:
-            # Use regex to get year, month, and day
+        # If one passcode is supplied to download one locked video
+        if len(passcode_list) == 1:
+            # find tag containing the video name
             try:
-                video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
-                day_date = video_date.group(3)
-                month_date = video_date.group(2)
-                year_date = video_date.group(1)
+                title = soup.find("div", class_="tw-basic-page-single-column").find("h2").text.strip()
+                title = checkFileName(title)
             except:
-                exit("Error getting dates")
+                title = "temp"
 
-            full_date = year_date + month_date + day_date + " - "
-            title = full_date + "".join(title)
-            print(title)
-            linksExtracted = linksExtracted + 1
-            download_dir = curr_dir
-            # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
-            # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-            # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
-            #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
-            #                '-headers', "Origin: https://twitcasting.tv"]
+            # Setup selenium
+            webDriver = webDriverSetup()
+            driver = webDriver[0]
+            WebDriverWait = webDriver[1]
+            EC = webDriver[2]
+            By = webDriver[3]
 
-            ffmpeg_list = ['ffmpeg', '-user_agent',
-                           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
-                           '-headers', "Origin: https://twitcasting.tv"]
-            ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
-            ffmpeg_list += [f'{download_dir}\\{title}.mp4']
             try:
-                subprocess.run(ffmpeg_list, check=True)
-            except subprocess.CalledProcessError as process:
-                sys.exit("Error executing ffmpeg")
-            print("\nExecuted")
+                driver.get(channelLink)
+            except Exception as getLinkException:
+                sys.exit(getLinkException)
+
+            # Find the password field element on the page
+            password_element = WebDriverWait(driver, 15).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+            button_element = WebDriverWait(driver, 15).until(
+                EC.presence_of_all_elements_located((By.CLASS_NAME, "tw-button-secondary.tw-button-small")))
+            # Enter and submit the passcode
+            password_element[0].send_keys(passcode_list[0])
+            button_element[0].click()
+
+            # Try to find the video element
+            try:
+                m3u8_tag = WebDriverWait(driver, 15).until(
+                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
+                # If video element is found then get the m3u8 url
+                if len(m3u8_tag) > 0:
+                    m3u8_tag_dic = json.loads(m3u8_tag[0].get_attribute("data-movie-playlist"))
+                    source_url = m3u8_tag_dic.get("2")[0].get("source").get("url")
+                    m3u8_url = source_url.replace("\\", "")
+                    m3u8_link = m3u8_url
+                    driver.quit()
+            except Exception as noElement:
+                print(str(noElement) + "\nCan't find private m3u8 tag")
+                driver.quit()
+
+            #copy from else statement below
+            # check to see if there are any m3u8 links
+            if len(m3u8_link) != 0:
+                # Use regex to get year, month, and day
+                try:
+                    video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
+                    day_date = video_date.group(3)
+                    month_date = video_date.group(2)
+                    year_date = video_date.group(1)
+                except:
+                    exit("Error getting dates")
+
+                full_date = year_date + month_date + day_date + " - "
+                title = full_date + "".join(title)
+                print("Title: ", title)
+                linksExtracted = linksExtracted + 1
+                download_dir = curr_dir
+                # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+                # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+                # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                #                '-headers', "Origin: https://twitcasting.tv"]
+
+                ffmpeg_list = ['ffmpeg', '-user_agent',
+                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                               '-headers', "Origin: https://twitcasting.tv"]
+                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                ffmpeg_list += [f'{download_dir}\\{title}.mp4']
+                try:
+                    subprocess.run(ffmpeg_list, check=True)
+                except subprocess.CalledProcessError as process:
+                    sys.exit("Error executing ffmpeg")
+                print("\nExecuted")
+            else:
+                sys.exit("Error can't find m3u8 links\n")
+
         else:
-            sys.exit("Error can't find m3u8 links\n")
+            m3u8_link = m3u8_scrape(channelLink)
+            # check to see if there are any m3u8 links
+            if len(m3u8_link) != 0:
+                # Use regex to get year, month, and day
+                try:
+                    video_date = re.search('(\d{4})/(\d{2})/(\d{2})', date)
+                    day_date = video_date.group(3)
+                    month_date = video_date.group(2)
+                    year_date = video_date.group(1)
+                except:
+                    exit("Error getting dates")
+
+                full_date = year_date + month_date + day_date + " - "
+                title = full_date + "".join(title)
+                print("Title: ", title)
+                linksExtracted = linksExtracted + 1
+                download_dir = curr_dir
+                # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+                # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+                # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                #                '-headers', "Origin: https://twitcasting.tv"]
+
+                ffmpeg_list = ['ffmpeg', '-user_agent',
+                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                               '-headers', "Origin: https://twitcasting.tv"]
+                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                ffmpeg_list += [f'{download_dir}\\{title}.mp4']
+                try:
+                    subprocess.run(ffmpeg_list, check=True)
+                except subprocess.CalledProcessError as process:
+                    sys.exit("Error executing ffmpeg")
+                print("\nExecuted")
+            else:
+                sys.exit("Error can't find m3u8 links\n")
     return linksExtracted, video_list
 
 
@@ -636,7 +731,7 @@ def main():
             sys.exit(f + "\nError occurred when opening passcode file")
     # Check if --passcode is specified and if it is set the passcode to a passcode_list
     if args.passcode:
-        passcode_list = args.passcode
+        passcode_list = [args.passcode]
     if args.archive:
         archive_info = getArchive(args.archive)
     else:
