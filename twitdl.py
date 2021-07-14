@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 # TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
 # TODO Allow user to specify -re and provide their own user-agent
+# TODO Allow user to specify directory name for batch download by utilizing % string formatting e.g. print("%(name)s said hi" % {"name": "Sam", "age": "21"})
 
 # Adds a link, name, and output argument
 # Returns the arguments
@@ -286,7 +287,7 @@ def checkFileName(fileName):
     invalidName = re.compile(r"[\\*?<>:\"/\|]")
     newFileName = fileName
     if re.search(invalidName, fileName) is not None:
-        newFileName = re.sub(invalidName, "", fileName)
+        newFileName = re.sub(invalidName, "_", fileName)
         print("\nInvalid File Name Detected\nNew File Name: " + newFileName)
     # If file name has multiple lines then join them together(because stripping newline doesn't work)
     if "\n" in fileName:
@@ -548,6 +549,9 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     title = full_date + title
                     print("Title: " + str(title))
 
+                # Get unique video id and append to the end of the title
+                vid_id = str(re.search("(\d+)$", link).group())
+                title = f"{title} - ({vid_id})"
                 linksExtracted = linksExtracted + 1
                 # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
                 # Use -n to avoid overwriting files and then avoid re-encoding by using copy
@@ -583,6 +587,13 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
     # Single link download
     else:
+        try:
+            # Get the unique video id
+            vid_id = str(re.search("(\d+)$", channelLink).group())
+        except:
+            print("Could not get video id")
+            pass
+
         # find tag containing the video name
         try:
             title = soup.find("span", id="movie_title_content").text.strip()
@@ -654,7 +665,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     exit("Error getting dates")
 
                 full_date = year_date + month_date + day_date + " - "
-                title = full_date + "".join(title)
+                title = f"{full_date} - {title} - ({vid_id})"
                 print("Title: ", title)
                 linksExtracted = linksExtracted + 1
                 download_dir = curr_dir
@@ -691,7 +702,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     exit("Error getting dates")
 
                 full_date = year_date + month_date + day_date + " - "
-                title = full_date + "".join(title)
+                title = f"{full_date}{title} - ({vid_id})"
                 print("Title: ", title)
                 linksExtracted = linksExtracted + 1
                 download_dir = curr_dir
