@@ -74,6 +74,9 @@ def webDriverSetup():
                 from selenium.webdriver.chrome.options import Options
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 opts = Options()
+                # opts.add_argument('--no-sandbox')
+                # opts.add_argument('--headless')
+                # opts.binary_location = "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
                 opts.add_argument(
                     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
                 opts.add_argument("Origin: https://twitcasting.tv")
@@ -83,13 +86,11 @@ def webDriverSetup():
             except Exception as webdriverException:
                 print(webdriverException)
             try:
-                from selenium.webdriver.firefox.options import Options
-                # add user-agent and origin to the command-line argument to avoid 502 errors
-                opts = Options()
-                opts.add_argument(
-                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-                opts.add_argument("Origin: https://twitcasting.tv")
-                driver = webdriver.Firefox(options=opts)
+                # Set firefox useragent using profile rather than options
+                profile = webdriver.FirefoxProfile()
+                profile.set_preference("general.useragent.override",
+                                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                driver = webdriver.Firefox(profile)
                 print('Using Firefox Driver')
                 break
             except Exception as webdriverException:
@@ -99,7 +100,7 @@ def webDriverSetup():
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 opts = Options()
                 opts.add_argument(
-                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
+                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0")
                 opts.add_argument("Origin: https://twitcasting.tv")
                 driver = webdriver.Edge(options=opts)
                 print('Using Edge Driver')
