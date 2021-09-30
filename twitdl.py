@@ -460,7 +460,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                         # Get all the links in the file and append into txt_list array
                         with open(archivePath, 'r', newline="") as txt_file:
                             for line in txt_file:
-                                txt_list.append(line)
+                                txt_list.append(line.rstrip())
                         # Check if the link is in the archive txt_list array and if so skip the download
                         if link in txt_list:
                             continue
