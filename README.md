@@ -27,9 +27,7 @@ usage: twitdl.py [-h] [-l] [-n  [...]] [-o OUTPUT [OUTPUT ...]]
 optional arguments:
   -h, --help        show this help message and exit
   -l, --link        The TwitCasting channel link to operate on
-  -n, --name        Name of the text archive file. If not specified a default name will be used. This argument is used to created 
-					the archive text file and this file can be used later in the --archive argument. 
-					This argument is no longer necessary with the introduction of --archive
+  -n, --name        Name of the text archive file. If not specified a default name will be used. This argument is used to created the archive text file and this file can be used later in the --archive argument. This argument is no longer necessary with the introduction of --archive
   -o, --output      The user's chosen absolute save path for the download video and/or csv file
   -s, --scrape      Only scrape inputted url and saved as the result in csv file(don't download)
   -f, --file	    Location of the text file that contains a list of the secret words. Can not be called along side --passcode
