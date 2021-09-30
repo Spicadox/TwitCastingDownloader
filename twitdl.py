@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import argparse
-import csv
 import json
 import os
 import re
@@ -8,7 +7,6 @@ import signal
 import subprocess
 import sys
 import traceback
-
 import requests
 from bs4 import BeautifulSoup
 
@@ -29,21 +27,24 @@ def arguments():
                         type=str,
                         nargs='+',
                         metavar='',
-                        help="Name of the csv file. If not specified a default name will be used.")
+                        help="Name of the text archive file. If not specified a default name will be used. "
+                             "This argument is used to created the archive text file and this file can be used later in "
+                             "the --archive argument. This argument is no longer necessary with the introduction of --archive")
 
     parser.add_argument('-o', '--output',
                         type=str,
                         nargs='+',
-                        help="The user's chosen absolute save path for the download video and/or csv file")
+                        help="The user's chosen absolute save path for the download video and/or archive file")
 
     parser.add_argument('-s', '--scrape',
                         action='store_true',
-                        help="Only scrape inputted url and saved as the result in csv file(don't download)")
+                        help="Only scrape inputted url and saved as the result in a text file(don't download)")
 
     parser.add_argument('-f', '--file',
                         type=str,
                         nargs='+',
-                        help="Location of the text file that contains a list of the secret words. Can not be called along side --passcode")
+                        help="Location of the text file that contains a list of the secret words. Can not be called "
+                             "along side --passcode")
 
     parser.add_argument('-p', '--passcode',
                         type=str,
@@ -236,30 +237,30 @@ def getDirectory(argOutput):
 
 
 # Function takes in 3 arguments: soup, sanitized link, and user input file name
-# Returns a proper filename for the csv file based on user input
+# Returns a proper filename for the txt file based on user input
 def getFileName(soup, cleanLink, argName):
     # Add special character exception
     if (argName is not None):
         # Check if the argName contains illegal characters
         joinedName = checkFileName(argName)
 
-        if (".csv" not in joinedName and isinstance(joinedName, list)):
-            fileName = joinedName.append(".csv")
-        if (".csv" not in joinedName):
-            fileName = joinedName + ".csv"
+        if (".txt" not in joinedName and isinstance(joinedName, list)):
+            fileName = joinedName.append(".txt")
+        if (".txt" not in joinedName):
+            fileName = joinedName + ".txt"
         else:
             fileName = joinedName
     else:
         channelName = soup.find(class_="tw-user-nav-name").text
         channelName = checkFileName(channelName)
         if ("/showclips" in cleanLink):
-            fileName = channelName.strip() + "_showclips.csv"
+            fileName = channelName.strip() + "_showclips.txt"
             return fileName
         elif ("/show" in cleanLink):
-            fileName = channelName.strip() + "_shows.csv"
+            fileName = channelName.strip() + "_shows.txt"
             return fileName
         else:
-            fileName = channelName.strip() + "_urls.csv"
+            fileName = channelName.strip() + "_urls.txt"
             return fileName
     fileName = "".join(fileName)
     return fileName
@@ -298,7 +299,7 @@ def checkFileName(fileName):
     newFileName = fileName
     if re.search(invalidName, fileName) is not None:
         newFileName = re.sub(invalidName, "_", fileName)
-        print("\nInvalid File Name Detected\nNew File Name: " + newFileName)
+        # print("\nInvalid File Name Detected\nNew File Name: " + newFileName)
     # If file name has multiple lines then join them together(because stripping newline doesn't work)
     if "\n" in fileName:
         title_array = fileName.splitlines()
@@ -355,22 +356,20 @@ def m3u8_scrape(link):
 
 
 # Function takes three arguments: the file name, soup, and boolean value batch
-# Scrapes the video title and url and then write it into a csv file
+# Scrapes the video title and url and then write it into a txt file
 # Returns the number of video url extracted for that page
 def linkScrape(fileName, soup, batch, passcode_list):
     video_list = []
     domainName = "https://twitcasting.tv"
     linksExtracted = 0
-    with open(fileName, 'a', newline='') as csv_file:
-        csv_writer = csv.writer(csv_file)
-
+    with open(fileName, 'a', newline='') as txt_file:
         # If it's just one link scrape
         if not batch:
             print("Links: " + "1")
             m3u8_link = m3u8_scrape(soup)
             if len(m3u8_link) != 0:
                 linksExtracted = linksExtracted + 1
-                csv_writer.writerow([m3u8_link])
+                txt_file.write(m3u8_link)
         # If it's a channel scrape
         else:
             # find all video url
@@ -405,10 +404,8 @@ def linkScrape(fileName, soup, batch, passcode_list):
                         title.insert(0, full_date)
                         title = "".join(title)
                         print("Title: " + title)
-                        # csv_writer.writerow([title])
                     linksExtracted = linksExtracted + 1
-                    csv_writer.writerow([m3u8_link])
-                    csv_writer.writerow(" ")
+                    txt_file.write(m3u8_link + "\n")
                 else:
                     print("Error can't find m3u8 links")
     return linksExtracted, video_list
@@ -427,7 +424,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     archivePath = archive_info[0]
     archiveExist = archive_info[1]
     m3u8_url = ""
-    csv_format = 'w'
+    txt_format = 'w'
     # Batch download
     if batch:
         # Maybe consider separating extractor from downloader
@@ -454,19 +451,21 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
         # loops through the link and title list in parallel
         for link, title, date in zip(video_list, title_list, date_list):
             try:
-                csv_list = []
+                txt_list = []
+                # If there is an archive file path set to append mode and if not set to write mode
                 if archivePath is not None:
                     if archiveExist:
-                        csv_format = 'a'
+                        txt_format = 'a'
                         # List index out of range error when theres extra/less space
-                        with open(archivePath, 'r', newline="") as csv_file:
-                            csv_reader = csv.reader(csv_file)
-                            for line in csv_reader:
-                                csv_list.append(line[0])
-                        if link in csv_list:
+                        # Get all the links in the file and append into txt_list array
+                        with open(archivePath, 'r', newline="") as txt_file:
+                            for line in txt_file:
+                                txt_list.append(line)
+                        # Check if the link is in the archive txt_list array and if so skip the download
+                        if link in txt_list:
                             continue
                     else:
-                        csv_format = 'w'
+                        txt_format = 'w'
             except Exception as archiveException:
                 sys.exit(str(archiveException) + "\n Error occurred creating an archive file")
 
@@ -565,7 +564,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 linksExtracted = linksExtracted + 1
                 # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
                 # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-                # -c copy -bsf:a aac_adtstoasc 
+                # -c copy -bsf:a aac_adtstoasc
                 # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
                 #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                 #                '-headers', "Origin: https://twitcasting.tv"]
@@ -586,10 +585,9 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 m3u8_link = ""
                 m3u8_url = ""
                 if archivePath is not None:
-                    with open(archivePath, csv_format, newline='') as csv_file:
+                    with open(archivePath, txt_format, newline='') as txt_file:
                         archiveExist = True
-                        csv_writer = csv.writer(csv_file)
-                        csv_writer.writerow([link])
+                        txt_file.write(link + "\n")
                         # Set appended to be true so on error this appended link can be tested and removed
                         print("appended\n")
             else:
@@ -762,9 +760,9 @@ def main():
     if args.file:
         try:
             pass_file = getDirectory(args.file)
-            with open(pass_file, 'r', newline='', encoding='utf-8') as csv_file:
-                csv_reader = csv.reader(csv_file)
-                passcode_list = list(csv_reader)
+            with open(pass_file, 'r', newline='', encoding='utf-8') as txt_file:
+                # csv_reader = csv.reader(csv_file)
+                passcode_list = list(txt_file)
         except Exception as f:
             sys.exit(f + "\nError occurred when opening passcode file")
     # Check if --passcode is specified and if it is set the passcode to a passcode_list
