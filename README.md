@@ -11,6 +11,7 @@ This was done to avoid the 502 error(rate limiting) imposed by Twitcasting.~~
 
 Update 4/22/2021: Rate-limiting has been removed a couple days ago
 
+Note: Now that yt-dlp has fixed their extractors for Twitcasting it is recommended to use yt-dlp instead. The only current advantage of this program over yt-dlp is the ability to more or less automate the processes of downloading/archiving all locked videos given a password text file.
 
 ### Installation
 Requires [FFMPEG](https://ffmpeg.org/download.html) in the current working directory or in PATH.
