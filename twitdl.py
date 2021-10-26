@@ -9,7 +9,9 @@ import sys
 import traceback
 import requests
 from bs4 import BeautifulSoup
+from pathlib import Path
 
+# TODO Allow user to specify root directory folder name rather than using channel name
 # TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
 # TODO Allow user to specify -re and provide their own user-agent
 # TODO Allow user to specify directory name for batch download by utilizing % string formatting e.g. print("%(name)s said hi" % {"name": "Sam", "age": "21"})
@@ -307,7 +309,8 @@ def checkFileName(fileName):
     return newFileName
 
 
-# Function that takes in foldername and create dir if it doesn't exist
+# Function that takes in foldername and create dir if it doesn't exist(used for batch downloading)
+# No longer used since user will provide folder name
 def createFolder(folderName):
     folderName = checkFileName(folderName)
     if os.path.isdir(folderName) is False:
@@ -441,8 +444,11 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             # When the class "tw-movie-thumbnail-date", can't be found due to perhaps newly uploaded video or 1st video
             date_list = soup.find_all("time")
 
-        createFolder(channel_name)
-        download_dir = curr_dir + "\\" + checkFileName(channel_name)
+        # Creates folder name based on channel name
+        # createFolder(channel_name)
+        # download_dir = curr_dir + "\\" + checkFileName(channel_name)
+
+        download_dir = curr_dir
 
         # add all video url to video list
         for link in url_list:
@@ -780,15 +786,19 @@ def main():
 
     # Get the directory path
     directoryPath = getDirectory(args.output)
+
     # Set the directory path
     try:
+        # Check if current directory exist and if not created it recursively
+        Path(directoryPath).mkdir(parents=True, exist_ok=True)
+
         if isinstance(directoryPath, list):
             os.chdir(os.path.abspath(directoryPath[0]))
         else:
             os.chdir(os.path.abspath(directoryPath))
     except Exception as e:
         # sys.exit("Error setting output directory")
-        sys.exit(e)
+        sys.exit(e, "\nError setting output directory")
     # Check if the file exist and if it does delete it
     checkFile(fileName)
 
