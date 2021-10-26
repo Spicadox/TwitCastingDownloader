@@ -43,5 +43,8 @@ optional arguments:
  
  `python twitdl.py -l <TwitCasting Link> -f "password.txt" -a "archive.txt"`
  
- This example downloads all the videos from this url(going through all the pages), archives it into the specified archive.txt file and outputs all the video into the -o output directory
- `python twitdl.py -l https://twitcasting.tv/natsuiromatsuri/show/ -o "I:\Twitcasting Archive\夏色まつり🏮NatsuiroMatsuri" -a "I:\Hololive\Gen 1\夏色まつり🏮ホロライブ1期生_twitcasting_archive.txt"`
+ 
+ This example below downloads all the videos from this url(going through all the pages), archives it into the specified archive.txt file, and outputs all the video into the -o output directory
+ ```
+ python twitdl.py -l https://twitcasting.tv/natsuiromatsuri/show/ -o "I:\Twitcasting Archive\夏色まつり🏮NatsuiroMatsuri" -a "I:\Hololive\Gen 1\夏色まつり🏮ホロライブ1期生_twitcasting_archive.txt"
+ ```
