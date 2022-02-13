@@ -65,7 +65,7 @@ def webDriverSetup():
     try:
         from selenium import webdriver
         from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoSuchElementException
+        from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.common.by import By
@@ -303,8 +303,8 @@ def checkFileName(fileName):
         newFileName = re.sub(invalidName, "_", fileName)
         # print("\nInvalid File Name Detected\nNew File Name: " + newFileName)
     # If file name has multiple lines then join them together(because stripping newline doesn't work)
-    if "\n" in fileName:
-        title_array = fileName.splitlines()
+    if "\n" in newFileName:
+        title_array = newFileName.splitlines()
         newFileName = " ".join(title_array)
     return newFileName
 
@@ -536,7 +536,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                             passcode_list.remove(current_passcode)
                         driver.quit()
                 except Exception as noElement:
-                    print(str(noElement) + "\nCan't find private m3u8 tag")
+                    print("Can't find private m3u8 tag", str(noElement))
                     driver.quit()
 
             # Send m3u8 url and ensure it's a valid m3u8 link
