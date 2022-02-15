@@ -10,6 +10,7 @@ import traceback
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
+import time
 
 # TODO Allow user to specify root directory folder name rather than using channel name
 # TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
@@ -344,17 +345,21 @@ def urlCount(soup, filter):
 # Get m3u8 url, cleans it up and then return it
 def m3u8_scrape(link):
     soup = soupSetup(link)
-    m3u8_url = ""
+    m3u8_url = []
+    print(f"\nFinding m3u8 url in {link}")
     try:
         # Finds the tag that contains the url
         video_tag = soup.find(class_="video-js")["data-movie-playlist"]
         # Turns the tag string to a dict and then cleans it up
-        video_dict = eval(video_tag)
-        source_url = video_dict.get("2")[0].get("source").get("url")
-        m3u8_url = source_url.replace("\\", "")
-        print("m3u8 link: " + m3u8_url)
-    except:
+        video_dict = json.loads(video_tag)
+        print(f"Found {len(video_dict)} m3u8 urls")
+        for video in video_dict['2']:
+            source_url = video["source"]["url"]
+            m3u8_url.append(source_url.replace("\\", ""))
+            print("m3u8 link: " + source_url)
+    except Exception as e:
         print("Private Video")
+        # print(e)
     return m3u8_url
 
 
@@ -426,7 +431,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     curr_dir = directoryPath
     archivePath = archive_info[0]
     archiveExist = archive_info[1]
-    m3u8_url = ""
+    m3u8_url = []
     txt_format = 'w'
     # Batch download
     if batch:
@@ -503,15 +508,19 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                         current_passcode = passcode
                         password_element = WebDriverWait(driver, 15).until(
                             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
-                        button_element = WebDriverWait(driver, 15).until(
-                            EC.presence_of_all_elements_located((By.CLASS_NAME, "tw-button-secondary.tw-button-small")))
-
                         password_element[0].send_keys(passcode)
-                        button_element[0].click()
+                        # If send_keys doesn't send the password then try clicking the send button
+                        try:
+                            button_element = WebDriverWait(driver, 15).until(
+                                EC.presence_of_all_elements_located((By.CLASS_NAME, "tw-button-secondary.tw-button-small")))
+                            button_element[0].click()
+                        except:
+                            pass
                         # If the password field element remains and there are still more passcodes then try again with another passcode
                         try:
                             password_element = WebDriverWait(driver, 10).until(
                                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+                            print(len(password_element) > 0)
                             if len(password_element) > 0:
                                 continue
                         except:
@@ -522,21 +531,23 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
                 # Try to find the video element
                 try:
-                    m3u8_tag = WebDriverWait(driver, 15).until(
+                    m3u8_tag_element = WebDriverWait(driver, 15).until(
                         EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
                     # If video element is found then get the m3u8 url
-                    if len(m3u8_tag) > 0:
-                        m3u8_tag_dic = json.loads(m3u8_tag[0].get_attribute("data-movie-playlist"))
-                        source_url = m3u8_tag_dic.get("2")[0].get("source").get("url")
-                        m3u8_url = source_url.replace("\\", "")
-                        m3u8_link = m3u8_url
-                        # If a passcode was used/set then remove it from the passcode_list
-                        # Helps speeds up entering the passcode by removing used passcode
-                        if current_passcode is not None:
-                            passcode_list.remove(current_passcode)
-                        driver.quit()
+                    if len(m3u8_tag_element) > 0:
+                        m3u8_tag_dic = json.loads(m3u8_tag_element[0].get_attribute("data-movie-playlist"))
+                        for m3u8_tag in m3u8_tag_dic['2']:
+                            source_url = m3u8_tag["source"]["url"]
+                            m3u8_url.append(source_url.replace("\\", ""))
+                            # prob not needed idr
+                            m3u8_link = m3u8_url
+                            # If a passcode was used/set then remove it from the passcode_list
+                            # Helps speeds up entering the passcode by removing used passcode
+                            if current_passcode is not None:
+                                passcode_list.remove(current_passcode)
+                            driver.quit()
                 except Exception as noElement:
-                    print("Can't find private m3u8 tag", str(noElement))
+                    print("Can't find private m3u8 tag,", str(noElement))
                     driver.quit()
 
             # Send m3u8 url and ensure it's a valid m3u8 link
@@ -556,46 +567,51 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     year_date = video_date.group(1)
                 except:
                     exit("Error getting dates")
-                # Only write title if src isn't in the tag
-                # Meaning it's not a private video title
-                if not title.has_attr('src'):
-                    full_date = year_date + month_date + day_date + " - "
-                    title = checkFileName(title.text.strip())
-                    title = full_date + title
-                    print("Title: " + str(title))
+                # Loop through and download all the m3u8
+                for i, m3u8 in enumerate(m3u8_link):
+                    # Only write title if src isn't in the tag
+                    # Meaning it's not a private video title
+                    if not title.has_attr('src'):
+                        full_date = year_date + month_date + day_date
+                        video_title = checkFileName(title.text.strip())
+                        if i == 0:
+                            video_title = f"{full_date} - {video_title}"
+                        else:
+                            video_title = f"{full_date} - {video_title}_{i+1}"
+                        print("Title: " + str(video_title))
 
-                # Get unique video id and append to the end of the title
-                vid_id = str(re.search("(\d+)$", link).group())
-                title = f"{title} - ({vid_id})"
-                linksExtracted = linksExtracted + 1
-                # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
-                # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-                # -c copy -bsf:a aac_adtstoasc
-                # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
-                #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
-                #                '-headers', "Origin: https://twitcasting.tv"]
+                    # Get unique video id and append to the end of the title
+                    vid_id = str(re.search("(\d+)$", link).group())
+                    video_title = f"{video_title} - ({vid_id})"
+                    linksExtracted = linksExtracted + 1
+                    # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+                    # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+                    # -c copy -bsf:a aac_adtstoasc
+                    # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                    #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                    #                '-headers', "Origin: https://twitcasting.tv"]
 
-                ffmpeg_list = ['ffmpeg', '-user_agent',
-                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
-                               '-headers', "Origin: https://twitcasting.tv"]
-                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
-                ffmpeg_list += [f'{download_dir}\\{title}.mp4']
-                # Add check for if -a is not specified but downloaded channel video already exist
-                # So check if {title} + .mp4 matches filename in that cwd
-                try:
-                    subprocess.run(ffmpeg_list, check=True)
-                except subprocess.CalledProcessError as process:
-                    sys.exit("Error executing ffmpeg")
-                print("\nExecuted")
+                    ffmpeg_list = ['ffmpeg', '-user_agent',
+                                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                                   '-headers', "Origin: https://twitcasting.tv"]
+                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                    ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
+                    # Add check for if -a is not specified but downloaded channel video already exist
+                    # So check if {title} + .mp4 matches filename in that cwd
+                    try:
+                        subprocess.run(ffmpeg_list, check=True)
+                    except subprocess.CalledProcessError as process:
+                        sys.exit("Error executing ffmpeg")
+                    print(f"\nExecuted and downloaded {i+1}/{len(m3u8_link)}")
                 # Reset m3u8 link and url
-                m3u8_link = ""
-                m3u8_url = ""
+                m3u8_link = []
+                m3u8_url = []
                 if archivePath is not None:
                     with open(archivePath, txt_format, newline='') as txt_file:
                         archiveExist = True
                         txt_file.write(link + "\n")
                         # Set appended to be true so on error this appended link can be tested and removed
-                        print("appended\n")
+                        print(f"Appended {link} to archive file\n")
             else:
                 print("Error can't find m3u8 links")
 
@@ -610,9 +626,9 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
         # find tag containing the video name
         try:
-            title = soup.find("span", id="movie_title_content").text.strip()
+            title = soup.find("span", class_="tw-player-page__title-editor-value").text.strip()
             title = checkFileName(title)
-        except:
+        except Exception as e:
             title = "temp"
         # find tag containing date/time
         try:
@@ -678,8 +694,8 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 except:
                     exit("Error getting dates")
 
-                full_date = year_date + month_date + day_date + " - "
-                title = f"{full_date} - {title} - ({vid_id})"
+                full_date = year_date + month_date + day_date
+                video_title = f"{full_date} - {title} ({vid_id})"
                 print("Title: ", title)
                 linksExtracted = linksExtracted + 1
                 download_dir = curr_dir
@@ -693,7 +709,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                                '-headers', "Origin: https://twitcasting.tv"]
                 ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
-                ffmpeg_list += [f'{download_dir}\\{title}.mp4']
+                ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
                 try:
                     subprocess.run(ffmpeg_list, check=True)
                 except subprocess.CalledProcessError as process:
@@ -715,27 +731,34 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 except:
                     exit("Error getting dates")
 
-                full_date = year_date + month_date + day_date + " - "
-                title = f"{full_date}{title} - ({vid_id})"
-                print("Title: ", title)
-                linksExtracted = linksExtracted + 1
-                download_dir = curr_dir
-                # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
-                # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-                # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
-                #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
-                #                '-headers', "Origin: https://twitcasting.tv"]
+                full_date = year_date + month_date + day_date
 
-                ffmpeg_list = ['ffmpeg', '-user_agent',
-                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
-                               '-headers', "Origin: https://twitcasting.tv"]
-                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
-                ffmpeg_list += [f'{download_dir}\\{title}.mp4']
-                try:
-                    subprocess.run(ffmpeg_list, check=True)
-                except subprocess.CalledProcessError as process:
-                    sys.exit("Error executing ffmpeg")
-                print("\nExecuted")
+                for i, m3u8 in enumerate(m3u8_link):
+                    if i == 0:
+                        video_title = f"{full_date} - {title}"
+                    else:
+                        video_title = f"{full_date} - {title}_{i + 1}"
+
+                    video_title = f"{video_title} - ({vid_id})"
+                    print("Title: ", video_title)
+                    linksExtracted = linksExtracted + 1
+                    download_dir = curr_dir
+                    # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
+                    # Use -n to avoid overwriting files and then avoid re-encoding by using copy
+                    # ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+                    #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                    #                '-headers', "Origin: https://twitcasting.tv"]
+
+                    ffmpeg_list = ['ffmpeg', '-user_agent',
+                                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                                   '-headers', "Origin: https://twitcasting.tv"]
+                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                    ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
+                    try:
+                        subprocess.run(ffmpeg_list, check=True)
+                    except subprocess.CalledProcessError as process:
+                        sys.exit("Error executing ffmpeg")
+                    print(f"\nExecuted and downloaded {i+1}/{len(m3u8_link)}\n")
             else:
                 sys.exit("Error can't find m3u8 links\n")
     return linksExtracted, video_list
