@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import base64
 import json
 import os
 import re
@@ -11,6 +12,8 @@ import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
 import time
+import logging
+
 
 # TODO Allow user to specify root directory folder name rather than using channel name
 # TODO Allow for the single download of passcode protected video i.e. python twitdl.py -l <TwitCasting Link> -p 12345
@@ -59,8 +62,14 @@ def arguments():
                         nargs='?',
                         help="Location of the archive text file that contains a list of urls pertaining to downloaded videos")
 
+    parser.add_argument('-c', '--cookies',
+                        type=str,
+                        nargs='+',
+                        help="Cookie file path in netscape format")
+
     args = parser.parse_args()
     return args
+
 
 def webDriverSetup():
     try:
@@ -70,20 +79,25 @@ def webDriverSetup():
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.common.by import By
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.support.wait import WebDriverWait
 
         # Find a webdriver in path and taking in order of either the chrome driver,
         # firefox driver, edge driver, or opera driver
         while not False:
             try:
                 from selenium.webdriver.chrome.options import Options
+                from webdriver_manager.chrome import ChromeDriverManager
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 opts = Options()
                 opts.add_argument('--headless')
+                opts.add_experimental_option('excludeSwitches', ['enable-logging'])
                 opts.add_argument(
                     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
                 opts.add_argument("Origin: https://twitcasting.tv")
                 try:
-                    driver = webdriver.Chrome(options=opts)
+                    logging.getLogger('WDM').setLevel(logging.NOTSET)
+                    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
                 except Exception as webdriverException:
                     print(webdriverException)
                     print("\nError occurred, retrying by changing chrome.exe binary location")
@@ -100,34 +114,37 @@ def webDriverSetup():
             try:
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 # Set firefox useragent using profile rather than options
+                from webdriver_manager.firefox import GeckoDriverManager
                 profile = webdriver.FirefoxProfile()
                 profile.set_preference("general.useragent.override",
                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-                driver = webdriver.Firefox(profile)
+                driver = webdriver.Firefox(service=Service(GeckoDriverManager().install()), firefox_profile=profile)
                 print('Using Firefox Driver')
                 break
             except Exception as webdriverException:
                 print(webdriverException)
             try:
                 from selenium.webdriver.edge.options import Options
+                from webdriver_manager.microsoft import EdgeChromiumDriverManager
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 opts = Options()
                 opts.add_argument(
                     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0")
                 opts.add_argument("Origin: https://twitcasting.tv")
-                driver = webdriver.Edge(options=opts)
+                driver = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()), options=opts)
                 print('Using Edge Driver')
                 break
             except Exception as webdriverException:
                 print(webdriverException)
             try:
                 from selenium.webdriver.opera.options import Options
+                from webdriver_manager.opera import OperaDriverManager
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 opts = Options()
                 opts.add_argument(
                     "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
                 opts.add_argument("Origin: https://twitcasting.tv")
-                driver = webdriver.Opera(options=opts)
+                driver = webdriver.Opera(service=Service(OperaDriverManager().install()), options=opts)
                 print('Using Safari Driver')
                 break
             except Exception as webdriverException:
@@ -138,7 +155,7 @@ def webDriverSetup():
 
 
 # Set up the soup and return it while requiring a link as an argument
-def soupSetup(cleanLink):
+def soupSetup(cleanLink, cookies, session):
     try:
         url = cleanLink
     except Exception:
@@ -146,7 +163,7 @@ def soupSetup(cleanLink):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
         'Origin': 'https://twitcasting.tv'}
-    req = requests.get(url, headers=headers)
+    req = session.get(url, headers=headers, cookies=cookies)
     bSoup = BeautifulSoup(req.text, "html.parser")
     return bSoup
 
@@ -154,31 +171,36 @@ def soupSetup(cleanLink):
 # Takes -l argument and "sanitize" url
 # If link doesn't end with /show or /showclips then invalid link
 # Returns the "sanitized" url
-def linkCleanUp(argLink):
+def linkCleanUp(argLink, cookies):
     cleanLink = None
     if (argLink is not None):
         url = argLink
     else:
         url = input("URL: ")
     # Download m3u8 link if provided
-    downloadM3u8(url)
+    downloadM3u8(url, cookies)
     # Take a look at this if statement back in master branch
-    if ("https://" not in url and "http://" not in url):
+    if "https://" not in url and "http://" not in url:
         url = "https://" + url
-    if ("/showclips" in url):
+    if "/showclips" in url:
         cleanLink = url.split("/showclips")[0]
         cleanLink = cleanLink + "/showclips/"
         filterType = "showclips"
         return cleanLink, filterType
-    elif ("/show" in url):
+    elif "/show" in url:
         cleanLink = url.split("/show")[0]
         cleanLink = cleanLink + "/show/"
         filterType = "show"
         return cleanLink, filterType
+    elif "/archive" in url:
+        cleanLink = url.split("/archive")[0]
+        cleanLink = cleanLink + "/archive/"
+        filterType = "archive"
+        return cleanLink, filterType
     # pattern is movie/[numbers]
     moviePattern = re.compile(r'movie/\d+')
-    if ("twitcasting.tv/" in url and moviePattern.findall(url) is []):
-        if (url.rindex("/") == len(url) - 1):
+    if "twitcasting.tv/" in url and moviePattern.findall(url) is []:
+        if url.rindex("/") == len(url) - 1:
             cleanLink = url + "show/"
             return cleanLink, "show"
         else:
@@ -197,7 +219,7 @@ def linkCleanUp(argLink):
 
 
 # Function takes index.m3u8 link and downloads it in cwd as {video_id}.mp4 and then exits
-def downloadM3u8(m3u8):
+def downloadM3u8(m3u8, cookies):
     # Check if its an m3u8 link
     # https://dl01.twitcasting.tv/tc.vod/v/674030808.0.2-1618443661-1618472461-4ec6dd13-901d44e31383a107/fmp4/index.m3u8
     moviePattern = re.compile(r'(https|http)(:\/\/.*\.)(twitcasting\.tv\/tc\.vod\/v\/)(\d+)(.*)(\/fmp4\/index\.m3u8)$')
@@ -207,10 +229,12 @@ def downloadM3u8(m3u8):
         download_dir = os.getcwd()
         # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
         # Use -n to avoid overwriting files and then avoid re-encoding by using copy
-        ffmpeg_list = ['ffmpeg', '-re', '-user_agent',
+        ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-re', '-user_agent',
                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                        '-headers', "Origin: https://twitcasting.tv"]
-        ffmpeg_list += ['-n', '-i', m3u8, '-c:v', 'copy', '-c:a', 'copy']
+        if cookies != {}:
+            ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
+        ffmpeg_list += ['-n', '-i', m3u8, '-c:v', 'copy', '-c:a', 'copy', '-movflags', '+faststart']
         ffmpeg_list += [f'{download_dir}\\{video_id}.mp4']
         try:
             print("Downloading from index.m3u8\n")
@@ -219,6 +243,7 @@ def downloadM3u8(m3u8):
             sys.exit("Error executing ffmpeg")
         print("\nExecuted")
         sys.exit("\nDownloaded Successfully")
+
 
 # Function takes in two arguments: the base link and page number
 # Returns a new link by contacting base link and page number
@@ -288,6 +313,22 @@ def getArchive(archiveArg):
     return archivePath, archiveExist
 
 
+def getCookies(cookie_file):
+    cookies = {}
+    regex = ".*(tc_id|tc_ss)\s(.*)"
+    try:
+        with open(cookie_file, 'r') as cf:
+            for line in cf:
+                match = re.search(string=line, pattern=regex)
+                if match is not None:
+                    cookies[match.group(1)] = match.group(2)
+        if len(cookies) < 2:
+            sys.exit("Error configuring the cookie file. Note cookie file must contain tc_id and tc_ss keys")
+    except FileNotFoundError:
+        sys.exit("Can not find cookie file")
+    return cookies
+
+
 # Function takes in the file name and check if it exists
 # If the file exists, then remove it(replace the file)
 def checkFile(fileName):
@@ -341,15 +382,23 @@ def urlCount(soup, filter):
         return [totalPages, totalUrl]
 
 
-# Function that takes in the index.m3u8 url
-# Get m3u8 url, cleans it up and then return it
-def m3u8_scrape(link):
-    soup = soupSetup(link)
+# Function that gets all the m3u8 url(since the page can contain more than one video)
+# cleans it up and then return it along with membership status
+def m3u8_scrape(link, cookies, session):
+    soup = soupSetup(link, cookies, session)
+    video_list = []
     m3u8_url = []
     print(f"\nFinding m3u8 url in {link}")
     try:
         # Finds the tag that contains the url
         video_tag = soup.find(class_="video-js")["data-movie-playlist"]
+        # base64 does not contain quote
+        if '"' not in video_tag:
+            # Reverse string and decode base64
+            video_tag = base64.b64decode(video_tag[::-1]).decode('utf-8')
+        membership_status = True if soup.find(id="groupinfolink") is not None else False
+        if membership_status:
+            print("Member's Only Video")
         # Turns the tag string to a dict and then cleans it up
         video_dict = json.loads(video_tag)
         print(f"Found {len(video_dict)} m3u8 urls")
@@ -357,16 +406,18 @@ def m3u8_scrape(link):
             source_url = video["source"]["url"]
             m3u8_url.append(source_url.replace("\\", ""))
             print("m3u8 link: " + source_url)
-    except Exception as e:
+        video_list.append(m3u8_url)
+        video_list.append(membership_status)
+    except Exception:
         print("Private Video")
-        # print(e)
-    return m3u8_url
+    return video_list
 
 
 # Function takes three arguments: the file name, soup, and boolean value batch
 # Scrapes the video title and url and then write it into a txt file
 # Returns the number of video url extracted for that page
-def linkScrape(fileName, soup, batch, passcode_list):
+def linkScrape(fileName, soup, batch, passcode_list, cookies):
+    session = requests.Session()
     video_list = []
     domainName = "https://twitcasting.tv"
     linksExtracted = 0
@@ -374,7 +425,7 @@ def linkScrape(fileName, soup, batch, passcode_list):
         # If it's just one link scrape
         if not batch:
             print("Links: " + "1")
-            m3u8_link = m3u8_scrape(soup)
+            m3u8_link, membership_status = m3u8_scrape(soup, cookies, session)
             if len(m3u8_link) != 0:
                 linksExtracted = linksExtracted + 1
                 txt_file.write(m3u8_link)
@@ -393,7 +444,7 @@ def linkScrape(fileName, soup, batch, passcode_list):
                 video_list.append(domainName + link["href"])
             # loops through the link and title list in parallel
             for link, title, date in zip(video_list, title_list, date_list):
-                m3u8_link = m3u8_scrape(link)
+                m3u8_link, membership_status = m3u8_scrape(link, cookies, session)
                 # check to see if there are any m3u8 links
                 if len(m3u8_link) != 0:
                     try:
@@ -423,7 +474,7 @@ def linkScrape(fileName, soup, batch, passcode_list):
 # Scrapes for video info
 # And then calls ffmpeg to download the stream
 # Returns the number of video url extracted for that page
-def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info):
+def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info, cookies):
     video_list = []
     m3u8_link = []
     domainName = "https://twitcasting.tv"
@@ -433,6 +484,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     archiveExist = archive_info[1]
     m3u8_url = []
     txt_format = 'w'
+    session = requests.Session()
     # Batch download
     if batch:
         # Maybe consider separating extractor from downloader
@@ -520,7 +572,6 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                         try:
                             password_element = WebDriverWait(driver, 10).until(
                                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
-                            print(len(password_element) > 0)
                             if len(password_element) > 0:
                                 continue
                         except:
@@ -547,11 +598,18 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                                 passcode_list.remove(current_passcode)
                             driver.quit()
                 except Exception as noElement:
-                    print("Can't find private m3u8 tag,", str(noElement))
+                    print("Can't find private m3u8 tag,", str(noElement), "It may be a protected stream")
                     driver.quit()
 
             # Send m3u8 url and ensure it's a valid m3u8 link
-            m3u8_link = m3u8_scrape(link)
+            try:
+                m3u8_link, membership_status = m3u8_scrape(link, cookies, session)
+            except ValueError:
+                continue
+            if membership_status and "\\【Member Video】" not in download_dir:
+                download_dir = download_dir + "\\【Member Video】"
+            elif not membership_status:
+                download_dir = download_dir.replace("\\【Member Video】", "")
             if len(m3u8_link) == 0:
                 m3u8_link = m3u8_url
 
@@ -578,11 +636,13 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                             video_title = f"{full_date} - {video_title}"
                         else:
                             video_title = f"{full_date} - {video_title}_{i+1}"
-                        print("Title: " + str(video_title))
 
                     # Get unique video id and append to the end of the title
                     vid_id = str(re.search("(\d+)$", link).group())
-                    video_title = f"{video_title} - ({vid_id})"
+                    video_title = f"{video_title} ({vid_id})"
+                    if os.path.isfile(f'{download_dir}\\{video_title}.mp4'):
+                        video_title = video_title + str(i)
+                    print("Title: " + str(video_title))
                     linksExtracted = linksExtracted + 1
                     # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
                     # Use -n to avoid overwriting files and then avoid re-encoding by using copy
@@ -591,16 +651,18 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                     #                '-headers', "Origin: https://twitcasting.tv"]
 
-                    ffmpeg_list = ['ffmpeg', '-user_agent',
+                    ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent',
                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                                    '-headers', "Origin: https://twitcasting.tv"]
-                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                    if cookies != {}:
+                        ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
+                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
                     ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
                     # Add check for if -a is not specified but downloaded channel video already exist
                     # So check if {title} + .mp4 matches filename in that cwd
                     try:
                         subprocess.run(ffmpeg_list, check=True)
-                    except subprocess.CalledProcessError as process:
+                    except subprocess.CalledProcessError:
                         sys.exit("Error executing ffmpeg")
                     print(f"\nExecuted and downloaded {i+1}/{len(m3u8_link)}")
                 # Reset m3u8 link and url
@@ -705,21 +767,23 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                 #                '-headers', "Origin: https://twitcasting.tv"]
 
-                ffmpeg_list = ['ffmpeg', '-user_agent',
+                ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent',
                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                                '-headers', "Origin: https://twitcasting.tv"]
-                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                if cookies != {}:
+                    ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
+                ffmpeg_list += ['-n', '-i', m3u8_link, '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
                 ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
                 try:
                     subprocess.run(ffmpeg_list, check=True)
-                except subprocess.CalledProcessError as process:
+                except subprocess.CalledProcessError:
                     sys.exit("Error executing ffmpeg")
                 print("\nExecuted")
             else:
                 sys.exit("Error can't find m3u8 links\n")
 
         else:
-            m3u8_link = m3u8_scrape(channelLink)
+            m3u8_link, membership_status = m3u8_scrape(channelLink, cookies, session)
             # check to see if there are any m3u8 links
             if len(m3u8_link) != 0:
                 # Use regex to get year, month, and day
@@ -739,7 +803,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     else:
                         video_title = f"{full_date} - {title}_{i + 1}"
 
-                    video_title = f"{video_title} - ({vid_id})"
+                    video_title = f"{video_title} ({vid_id})"
                     print("Title: ", video_title)
                     linksExtracted = linksExtracted + 1
                     download_dir = curr_dir
@@ -749,14 +813,16 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                     #                '-headers', "Origin: https://twitcasting.tv"]
 
-                    ffmpeg_list = ['ffmpeg', '-user_agent',
+                    ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent',
                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                                    '-headers', "Origin: https://twitcasting.tv"]
-                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                    if cookies != {}:
+                        ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
+                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
                     ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
                     try:
                         subprocess.run(ffmpeg_list, check=True)
-                    except subprocess.CalledProcessError as process:
+                    except subprocess.CalledProcessError:
                         sys.exit("Error executing ffmpeg")
                     print(f"\nExecuted and downloaded {i+1}/{len(m3u8_link)}\n")
             else:
@@ -773,13 +839,19 @@ def main():
     linksExtracted = 0
     # Get commandline arguments
     args = arguments()
+    # Get cookies for membership videos
+    if args.cookies:
+        cookies = getCookies("".join(args.cookies))
+    else:
+        cookies = {}
+
     # Get the clean twitcast channel link
     try:
-        linkCleanedUp = linkCleanUp(args.link)
+        linkCleanedUp = linkCleanUp(args.link, cookies)
         channelLink = linkCleanedUp[0]
         channelFilter = linkCleanedUp[1]
     except Exception as linkError:
-        sys.exit(linkError + "\nInvalid Link")
+        sys.exit(str(linkError) + "\nInvalid Link")
 
     # Check and make sure both --file and --passcode isn't specified at once
     passcode_list = []
@@ -793,7 +865,7 @@ def main():
                 # csv_reader = csv.reader(csv_file)
                 passcode_list = list(txt_file)
         except Exception as f:
-            sys.exit(f + "\nError occurred when opening passcode file")
+            sys.exit(str(f) + "\nError occurred when opening passcode file")
     # Check if --passcode is specified and if it is set the passcode to a passcode_list
     if args.passcode:
         passcode_list = [args.passcode]
@@ -803,7 +875,8 @@ def main():
         archive_info = [None, False]
 
     # Set up beautifulsoup
-    soup = soupSetup(channelLink)
+    session = requests.Session()
+    soup = soupSetup(channelLink, cookies, session)
     # Get the filename
     fileName = getFileName(soup, channelLink, args.name)
 
@@ -821,7 +894,7 @@ def main():
             os.chdir(os.path.abspath(directoryPath))
     except Exception as e:
         # sys.exit("Error setting output directory")
-        sys.exit(e, "\nError setting output directory")
+        sys.exit(str(e), "\nError setting output directory")
     # Check if the file exist and if it does delete it
     checkFile(fileName)
 
@@ -843,17 +916,17 @@ def main():
                 print("\nPage: " + str(currentPage + 1))
             if (currentPage != 0):
                 updatedLink = updateLink(channelLink, currentPage)
-                soup = soupSetup(updatedLink)
+                soup = soupSetup(updatedLink, cookies, session)
             # If --scrape is not specified then download video else just scrape
             if not args.scrape:
-                linksExtracted += linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info)[0]
+                linksExtracted += linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info, cookies)[0]
                 if batch:
                     print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
                 else:
                     sys.exit("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
 
             else:
-                linksExtracted += linkScrape(fileName, soup, batch, passcode_list)[0]
+                linksExtracted += linkScrape(fileName, soup, batch, passcode_list, cookies)[0]
                 if batch:
                     print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + totalLinks + "\nExiting")
                 else:
@@ -861,10 +934,10 @@ def main():
     # Initiate single download or scrape
     else:
         if not args.scrape:
-            linksExtracted += linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info)[0]
+            linksExtracted += linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive_info, cookies)[0]
             print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
         else:
-            linksExtracted += linkScrape(fileName, channelLink, batch, passcode_list)[0]
+            linksExtracted += linkScrape(fileName, channelLink, batch, passcode_list, cookies)[0]
             print("\nTotal Links Extracted: " + str(linksExtracted) + "/" + "1" + "\nExiting")
 
 
