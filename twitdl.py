@@ -20,6 +20,7 @@ import logging
 # TODO Allow user to specify -re and provide their own user-agent
 # TODO Allow user to specify directory name for batch download by utilizing % string formatting e.g. print("%(name)s said hi" % {"name": "Sam", "age": "21"})
 
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
 # Adds a link, name, and output argument
 # Returns the arguments
 def arguments():
@@ -86,39 +87,35 @@ def webDriverSetup():
         # firefox driver, edge driver, or opera driver
         while not False:
             try:
-                from selenium.webdriver.chrome.options import Options
+                from selenium.webdriver.chrome.service import Service
                 from webdriver_manager.chrome import ChromeDriverManager
-                # add user-agent and origin to the command-line argument to avoid 502 errors
-                opts = Options()
-                opts.add_argument('--headless')
-                opts.add_experimental_option('excludeSwitches', ['enable-logging'])
-                opts.add_argument(
-                    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-                opts.add_argument("Origin: https://twitcasting.tv")
-                try:
-                    logging.getLogger('WDM').setLevel(logging.NOTSET)
-                    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-                except Exception as webdriverException:
-                    print(webdriverException)
-                    print("\nError occurred, retrying by changing chrome.exe binary location")
-                    opts.binary_location = "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
-                    try:
-                        driver = webdriver.Chrome(options=opts)
-                    except Exception as webdriverException:
-                        print(webdriverException)
-                        print("\nError trying to use chromedriver")
-                print('Using Chrome Driver')
+                chrome_options = webdriver.ChromeOptions()
+                chrome_options.add_argument('--headless')
+                chrome_options.add_argument('--mute-audio')
+                chrome_options.add_argument('--lang=en-US')
+                chrome_options.add_argument(
+                    f"--user-agent={user_agent}")
+                chrome_options.add_argument("--origin=https://twitcasting.tv")
+                chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
                 break
             except Exception as webdriverException:
                 print(webdriverException)
             try:
                 # add user-agent and origin to the command-line argument to avoid 502 errors
                 # Set firefox useragent using profile rather than options
+                from selenium.webdriver.firefox.service import Service
                 from webdriver_manager.firefox import GeckoDriverManager
-                profile = webdriver.FirefoxProfile()
-                profile.set_preference("general.useragent.override",
-                                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-                driver = webdriver.Firefox(service=Service(GeckoDriverManager().install()), firefox_profile=profile)
+                firefox_options = webdriver.FirefoxOptions()
+                # firefox_options.headless = True
+                firefox_options.add_argument("--headless")
+                # Update user agent if bad request 400 when downloading m3u8
+                firefox_options.set_preference("media.volume_scale", "0.0")
+                firefox_options.set_preference('intl.accept_languages', 'en-GB')
+                firefox_options.set_preference("general.useragent.override",
+                                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
+                firefox_options.add_argument("--origin=https://twitcasting.tv")
+                driver = webdriver.Firefox(service=Service(GeckoDriverManager().install()), options=firefox_options)
                 print('Using Firefox Driver')
                 break
             except Exception as webdriverException:
@@ -148,6 +145,7 @@ def webDriverSetup():
                 print('Using Safari Driver')
                 break
             except Exception as webdriverException:
+                print(traceback.format_exc())
                 sys.exit(webdriverException)
     except webdriver or Keys as importException:
         sys.exit(str(importException) + "\nError importing")
@@ -161,7 +159,7 @@ def soupSetup(cleanLink, cookies, session):
     except Exception:
         sys.exit("Invalid URL")
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36',
+        'User-Agent': f'{user_agent}',
         'Origin': 'https://twitcasting.tv'}
     req = session.get(url, headers=headers, cookies=cookies)
     bSoup = BeautifulSoup(req.text, "html.parser")
@@ -230,7 +228,7 @@ def downloadM3u8(m3u8, cookies):
         # Use -re, -user_agent, and -headers to set x1 read speed and avoid 502 error
         # Use -n to avoid overwriting files and then avoid re-encoding by using copy
         ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-re', '-user_agent',
-                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
                        '-headers', "Origin: https://twitcasting.tv"]
         if cookies != {}:
             ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
@@ -388,6 +386,7 @@ def m3u8_scrape(link, cookies, session):
     soup = soupSetup(link, cookies, session)
     video_list = []
     m3u8_url = []
+    membership_status = False
     print(f"\nFinding m3u8 url in {link}")
     try:
         # Finds the tag that contains the url
@@ -410,6 +409,8 @@ def m3u8_scrape(link, cookies, session):
         video_list.append(membership_status)
     except Exception:
         print("Private Video")
+        video_list.append(None)
+        video_list.append(membership_status)
     return video_list
 
 
@@ -583,7 +584,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 # Try to find the video element
                 try:
                     m3u8_tag_element = WebDriverWait(driver, 15).until(
-                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[data-movie-playlist]")))
+                        EC.presence_of_all_elements_located((By.CLASS_NAME, "video-js")))
                     # If video element is found then get the m3u8 url
                     if len(m3u8_tag_element) > 0:
                         m3u8_tag_dic = json.loads(m3u8_tag_element[0].get_attribute("data-movie-playlist"))
@@ -604,13 +605,14 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
             # Send m3u8 url and ensure it's a valid m3u8 link
             try:
                 m3u8_link, membership_status = m3u8_scrape(link, cookies, session)
+                if membership_status and "\\【Member Video】" not in download_dir:
+                    download_dir = download_dir + "\\【Member Video】"
+                elif not membership_status:
+                    download_dir = download_dir.replace("\\【Member Video】", "")
             except ValueError:
                 continue
-            if membership_status and "\\【Member Video】" not in download_dir:
-                download_dir = download_dir + "\\【Member Video】"
-            elif not membership_status:
-                download_dir = download_dir.replace("\\【Member Video】", "")
-            if len(m3u8_link) == 0:
+
+            if m3u8_link is None or len(m3u8_link) == 0:
                 m3u8_link = m3u8_url
 
             # check to see if there are any m3u8 links
@@ -651,12 +653,12 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                     #                '-headers', "Origin: https://twitcasting.tv"]
 
-                    ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent',
-                                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                    ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent', user_agent,
                                    '-headers', "Origin: https://twitcasting.tv"]
                     if cookies != {}:
                         ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
-                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                    # Note split at & since cmd doesn't like it: e.g. https://dl193236.twitcasting.tv/tc.vod.v2/v1/streams/760007902.0.2/hls/master.m3u8?k=%2Ftc.vod%2Fv%2F760007902.0.2-1677557604-1677586404-f21a6f25-00d91311525594a4&spm=1
+                    ffmpeg_list += ['-n', '-i', m3u8.split("&")[0], '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
                     ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
                     # Add check for if -a is not specified but downloaded channel video already exist
                     # So check if {title} + .mp4 matches filename in that cwd
@@ -767,8 +769,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                 #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                 #                '-headers', "Origin: https://twitcasting.tv"]
 
-                ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent',
-                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent', user_agent,
                                '-headers', "Origin: https://twitcasting.tv"]
                 if cookies != {}:
                     ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
@@ -813,8 +814,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     #                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
                     #                '-headers', "Origin: https://twitcasting.tv"]
 
-                    ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent',
-                                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
+                    ffmpeg_list = ['ffmpeg', '-v', 'quiet', '-stats', '-user_agent', user_agent,
                                    '-headers', "Origin: https://twitcasting.tv"]
                     if cookies != {}:
                         ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
