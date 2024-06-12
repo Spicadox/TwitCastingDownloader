@@ -277,7 +277,7 @@ def getFileName(soup, cleanLink, argName):
         else:
             fileName = joinedName
     else:
-        channelName = soup.find(class_="tw-user-nav-name").text
+        channelName = soup.find(class_="tw-user-nav2-name").text
         channelName = checkFileName(channelName)
         if ("/showclips" in cleanLink):
             fileName = channelName.strip() + "_showclips.txt"
@@ -433,11 +433,11 @@ def linkScrape(fileName, soup, batch, passcode_list, cookies):
         # If it's a channel scrape
         else:
             # find all video url
-            url_list = soup.find_all("a", class_="tw-movie-thumbnail")
+            url_list = soup.find_all("a", class_="tw-movie-thumbnail2")
             # find all tag containing video title
-            title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
+            title_list = soup.find_all("span", class_="tw-movie-thumbnail2-title")
             # find all tag containing date/time
-            date_list = soup.find_all("time", class_="tw-movie-thumbnail-date")
+            date_list = soup.find_all("time", class_="tw-movie-thumbnail2-date")
 
             print("Links: " + str(len(url_list)))
             # add all video url to video list
@@ -490,14 +490,14 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
     if batch:
         # Maybe consider separating extractor from downloader
         # find all video url
-        url_list = soup.find_all("a", class_="tw-movie-thumbnail")
+        url_list = soup.find_all("a", class_="tw-movie-thumbnail2")
         # get channel name
-        channel_name = soup.find("span", class_="tw-user-nav-name").text.strip()
+        channel_name = soup.find("span", class_="tw-user-nav2-name").text.strip()
         # find all tag containing video title
-        title_list = soup.find_all("span", class_="tw-movie-thumbnail-title")
+        title_list = soup.find_all("span", class_="tw-movie-thumbnail2-title")
         # find all tag containing date/time
         try:
-            date_list = soup.find_all(class_="tw-movie-thumbnail-date")
+            date_list = soup.find_all(class_="tw-movie-thumbnail2-date")
         except:
             # When the class "tw-movie-thumbnail-date", can't be found due to perhaps newly uploaded video or 1st video
             date_list = soup.find_all("time")
@@ -548,8 +548,12 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     sys.exit(getLinkException)
 
                 # Find the password field element on the page
-                password_element = WebDriverWait(driver, 15).until(
-                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+                try:
+                    password_element = WebDriverWait(driver, 15).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "input[name='password']")))
+                except Exception as web_element_exception:
+                    print(web_element_exception)
+                    break
 
                 # While the password element field remains and correct password hasn't been entered
                 current_passcode = None
@@ -658,7 +662,7 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
                     if cookies != {}:
                         ffmpeg_list += ['-headers', f"Cookie: 'tc_id'={cookies['tc_id']}; tc_ss={cookies['tc_ss']}"]
                     # Note split at & since cmd doesn't like it: e.g. https://dl193236.twitcasting.tv/tc.vod.v2/v1/streams/760007902.0.2/hls/master.m3u8?k=%2Ftc.vod%2Fv%2F760007902.0.2-1677557604-1677586404-f21a6f25-00d91311525594a4&spm=1
-                    ffmpeg_list += ['-n', '-i', m3u8.split("&")[0], '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
+                    ffmpeg_list += ['-n', '-i', m3u8, '-c', 'copy', '-hls_time', '4', '-hls_list_size', '0', '-hls_flags', 'discont_detect+append_list+split_by_time', '-movflags', '+faststart', '-f', 'mp4', '-bsf:a', 'aac_adtstoasc']
                     ffmpeg_list += [f'{download_dir}\\{video_title}.mp4']
                     # Add check for if -a is not specified but downloaded channel video already exist
                     # So check if {title} + .mp4 matches filename in that cwd
@@ -690,13 +694,13 @@ def linkDownload(soup, directoryPath, batch, channelLink, passcode_list, archive
 
         # find tag containing the video name
         try:
-            title = soup.find("span", class_="tw-player-page__title-editor-value").text.strip()
+            title = soup.find("div", class_="tw-player-page-title-title").find("h2").text.strip()
             title = checkFileName(title)
         except Exception as e:
             title = "temp"
         # find tag containing date/time
         try:
-            date = soup.find("time", class_="tw-movie-thumbnail-date").text.strip()
+            date = soup.find("time", class_="tw-movie-thumbnail2-date").text.strip()
         except:
             # When the class "tw-movie-thumbnail-date", can't be found due to perhaps newly uploaded video or 1st video
             date = soup.find("time").text.strip()
